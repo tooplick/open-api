@@ -12,13 +12,6 @@ export function formatNumber(n?: number | null): string {
   return n.toLocaleString('en-US')
 }
 
-/** 额度展示:0 表示不限额 */
-export function formatQuota(used?: number | null, total?: number | null): string {
-  const u = formatNumber(used ?? 0)
-  if (!total || total <= 0) return `${u} / 不限`
-  return `${u} / ${formatNumber(total)}`
-}
-
 /** <input type="datetime-local"> 的值(yyyy-MM-ddTHH:mm)补足秒给后端 */
 export function localInputToIso(v: string): string | undefined {
   if (!v) return undefined

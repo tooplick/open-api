@@ -29,10 +29,6 @@ export interface User {
   role: string
   /** 1 启用 0 禁用 */
   status: number
-  /** 总额度(点数) */
-  quota: number
-  /** 已用额度(点数) */
-  usedQuota: number
   createTime?: string
   updateTime?: string
 }
@@ -66,9 +62,10 @@ export interface ApiKey {
   /** sk- 开头明文 */
   apiKey: string
   status: number
-  /** 独立额度上限,0 表示跟随用户 */
-  quota: number
-  usedQuota: number
+  /** 分组,决定可路由到哪些渠道 */
+  group: string
+  /** 模型白名单(逗号分隔),空表示不限制 */
+  models?: string | null
   /** 过期时间,null 永不过期 */
   expireTime?: string | null
   createTime?: string
@@ -77,7 +74,8 @@ export interface ApiKey {
 
 export interface CreateApiKeyRequest {
   name: string
-  quota?: number
+  group?: string
+  models?: string
   expireTime?: string | null
 }
 
@@ -90,6 +88,8 @@ export interface Channel {
   baseUrl: string
   /** 逗号分隔 */
   models: string
+  /** 分组,逗号分隔,可属多组 */
+  group: string
   /** 模型重命名映射(JSON) */
   modelMapping?: string | null
   status: number
@@ -104,40 +104,15 @@ export interface ChannelRequest {
   name: string
   type: string
   baseUrl: string
-  /** 上游密钥(只写) */
+  /** 上游密钥(只写,支持换行分隔多 key) */
   apiKey: string
   models: string
+  /** 分组,逗号分隔,可属多组 */
+  group: string
   modelMapping?: string
   weight: number
   priority: number
   status: number
-}
-
-// ---------- 模型 ----------
-export interface Model {
-  id: number
-  modelName: string
-  displayName?: string | null
-  /** chat / embedding / image */
-  type: string
-  /** 输入每 token 点数 */
-  promptPrice: number
-  /** 输出每 token 点数 */
-  completionPrice: number
-  status: number
-  remark?: string | null
-  createTime?: string
-  updateTime?: string
-}
-
-export interface ModelRequest {
-  modelName: string
-  displayName?: string
-  type: string
-  promptPrice: number
-  completionPrice: number
-  status: number
-  remark?: string
 }
 
 // ---------- 日志 ----------
@@ -154,7 +129,6 @@ export interface LogItem {
   promptTokens: number
   completionTokens: number
   totalTokens: number
-  quota: number
   durationMs: number
   requestId?: string
   ip?: string
@@ -167,5 +141,4 @@ export interface LogStat {
   promptTokens: number
   completionTokens: number
   totalTokens: number
-  quota: number
 }

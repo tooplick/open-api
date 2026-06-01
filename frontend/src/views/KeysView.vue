@@ -5,13 +5,13 @@ import type { ApiKey } from '@/types'
 import BaseModal from '@/components/BaseModal.vue'
 import { toast } from '@/composables/useToast'
 import { confirmDialog } from '@/composables/useConfirm'
-import { formatDateTime, formatQuota, localInputToIso } from '@/utils/format'
+import { formatDateTime, localInputToIso } from '@/utils/format'
 
 const keys = ref<ApiKey[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
 const creating = ref(false)
-const createForm = reactive({ name: '', quota: 0, expireTime: '' })
+const createForm = reactive({ name: '', group: 'default', models: '', expireTime: '' })
 const newlyCreated = ref<ApiKey | null>(null)
 
 async function load(): Promise<void> {
@@ -27,7 +27,8 @@ async function load(): Promise<void> {
 
 function openCreate(): void {
   createForm.name = ''
-  createForm.quota = 0
+  createForm.group = 'default'
+  createForm.models = ''
   createForm.expireTime = ''
   newlyCreated.value = null
   showCreate.value = true
@@ -42,7 +43,8 @@ async function submitCreate(): Promise<void> {
   try {
     const k = await createKey({
       name: createForm.name.trim(),
-      quota: Number(createForm.quota) || 0,
+      group: createForm.group.trim() || 'default',
+      models: createForm.models.trim() || undefined,
       expireTime: createForm.expireTime ? localInputToIso(createForm.expireTime) : null,
     })
     toast.success('创建成功')
@@ -115,7 +117,8 @@ onMounted(() => void load())
               <th>名称</th>
               <th>Key</th>
               <th>状态</th>
-              <th>额度(已用 / 总)</th>
+              <th>分组</th>
+              <th>模型限制</th>
               <th>过期时间</th>
               <th>创建时间</th>
               <th class="text-right">操作</th>
@@ -133,7 +136,8 @@ onMounted(() => void load())
                   {{ k.status === 1 ? '启用' : '禁用' }}
                 </span>
               </td>
-              <td class="mono">{{ formatQuota(k.usedQuota, k.quota) }}</td>
+              <td>{{ k.group }}</td>
+              <td class="wrap faint">{{ k.models || '不限' }}</td>
               <td>{{ k.expireTime ? formatDateTime(k.expireTime) : '永不过期' }}</td>
               <td>{{ formatDateTime(k.createTime) }}</td>
               <td class="text-right nowrap">
@@ -155,9 +159,14 @@ onMounted(() => void load())
           <input v-model.trim="createForm.name" class="input" placeholder="如:生产环境 / 我的应用" />
         </div>
         <div class="field">
-          <label class="field-label">独立额度上限</label>
-          <input v-model.number="createForm.quota" class="input" type="number" min="0" />
-          <span class="field-hint">0 表示不单独限额,跟随账户总额度</span>
+          <label class="field-label">分组</label>
+          <input v-model.trim="createForm.group" class="input" placeholder="default" />
+          <span class="field-hint">仅能路由到声明了同一分组的渠道</span>
+        </div>
+        <div class="field">
+          <label class="field-label">模型限制</label>
+          <textarea v-model.trim="createForm.models" class="textarea" placeholder="gpt-4o,gpt-4o-mini(可选)" />
+          <span class="field-hint">逗号分隔的模型白名单;留空表示不限制</span>
         </div>
         <div class="field">
           <label class="field-label">过期时间</label>

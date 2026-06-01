@@ -58,17 +58,14 @@ public class ChannelController {
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         UserContext.requireAdmin();
-        Channel update = new Channel();
-        update.setId(id);
-        update.setStatus(status);
-        channelService.updateById(update);
+        channelService.updateStatus(id, status);
         return Result.success();
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         UserContext.requireAdmin();
-        channelService.removeById(id);
+        channelService.deleteChannel(id);
         return Result.success();
     }
 }

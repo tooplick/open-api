@@ -12,7 +12,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 
 /**
- * relay 的 API Key 鉴权与额度预检。
+ * relay 的 API Key 鉴权。不计费, 仅校验 key 有效性与账号状态。
  */
 @Service
 @RequiredArgsConstructor
@@ -45,18 +45,7 @@ public class RelayAuthService {
         if (user.getStatus() == null || user.getStatus() != 1) {
             throw new RelayException(403, "account_disabled", "账号已被禁用");
         }
-        if (exceeded(user.getQuota(), user.getUsedQuota())) {
-            throw new RelayException(429, "insufficient_quota", "用户额度不足");
-        }
-        if (exceeded(apiKey.getQuota(), apiKey.getUsedQuota())) {
-            throw new RelayException(429, "insufficient_quota", "API Key 额度不足");
-        }
-        return new RelayContext(apiKey, user);
-    }
-
-    private boolean exceeded(Long quota, Long used) {
-        long q = quota == null ? 0 : quota;
-        long u = used == null ? 0 : used;
-        return q > 0 && u >= q;
+        String group = StringUtils.hasText(apiKey.getGroup()) ? apiKey.getGroup() : "default";
+        return new RelayContext(apiKey, user, group, apiKey.getModels());
     }
 }

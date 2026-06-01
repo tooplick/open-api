@@ -56,15 +56,4 @@ public class UserController {
         userService.updateById(update);
         return Result.success();
     }
-
-    /** 管理员:设置用户额度 */
-    @PutMapping("/{id}/quota")
-    public Result<Void> updateQuota(@PathVariable Long id, @RequestParam Long quota) {
-        UserContext.requireAdmin();
-        User update = new User();
-        update.setId(id);
-        update.setQuota(quota);
-        userService.updateById(update);
-        return Result.success();
-    }
 }

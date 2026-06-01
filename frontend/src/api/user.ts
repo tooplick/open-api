@@ -16,7 +16,3 @@ export function pageUsers(params: { current: number; size: number; username?: st
 export function updateUserStatus(id: number, status: number) {
   return put<void>(`/api/user/${id}/status`, undefined, { status })
 }
-
-export function updateUserQuota(id: number, quota: number) {
-  return put<void>(`/api/user/${id}/quota`, undefined, { quota })
-}

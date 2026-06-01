@@ -26,8 +26,7 @@ public class LogServiceImpl extends ServiceImpl<LogMapper, Log> implements LogSe
         qw.select("COUNT(*) AS requests",
                 "IFNULL(SUM(prompt_tokens),0) AS promptTokens",
                 "IFNULL(SUM(completion_tokens),0) AS completionTokens",
-                "IFNULL(SUM(total_tokens),0) AS totalTokens",
-                "IFNULL(SUM(quota),0) AS quota");
+                "IFNULL(SUM(total_tokens),0) AS totalTokens");
         if (userId != null) {
             qw.eq("user_id", userId);
         }
@@ -45,7 +44,6 @@ public class LogServiceImpl extends ServiceImpl<LogMapper, Log> implements LogSe
             vo.setPromptTokens(toLong(row.get("promptTokens")));
             vo.setCompletionTokens(toLong(row.get("completionTokens")));
             vo.setTotalTokens(toLong(row.get("totalTokens")));
-            vo.setQuota(toLong(row.get("quota")));
         }
         return vo;
     }

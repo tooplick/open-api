@@ -28,10 +28,4 @@ public class User extends BaseEntity {
 
     /** 1启用 0禁用 */
     private Integer status;
-
-    /** 总额度(点数) */
-    private Long quota;
-
-    /** 已用额度(点数) */
-    private Long usedQuota;
 }

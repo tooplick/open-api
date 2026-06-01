@@ -1,14 +1,13 @@
 package com.aiopen.platform.modules.relay;
 
-import com.aiopen.platform.modules.apikey.service.ApiKeyService;
 import com.aiopen.platform.modules.channel.entity.Channel;
 import com.aiopen.platform.modules.channel.service.ChannelService;
 import com.aiopen.platform.modules.log.entity.Log;
 import com.aiopen.platform.modules.log.service.LogService;
-import com.aiopen.platform.modules.model.entity.Model;
-import com.aiopen.platform.modules.model.service.ModelService;
+import com.aiopen.platform.modules.relay.adaptor.AdaptorFactory;
+import com.aiopen.platform.modules.relay.adaptor.StreamState;
+import com.aiopen.platform.modules.relay.adaptor.UpstreamAdaptor;
 import com.aiopen.platform.modules.relay.exception.RelayException;
-import com.aiopen.platform.modules.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,18 +24,21 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 /**
- * 请求转发核心。鉴权 -> 选路 -> 转发上游(流式/非流式)-> 计费 -> 记日志。
+ * 请求转发核心。鉴权 -> 选路 -> 选适配器 -> 转换并转发上游(流式/非流式)-> 记 token 日志。不计费。
  */
 @Slf4j
 @Service
@@ -47,10 +49,8 @@ public class RelayService {
 
     private final RelayAuthService relayAuthService;
     private final ChannelService channelService;
-    private final ModelService modelService;
-    private final UserService userService;
-    private final ApiKeyService apiKeyService;
     private final LogService logService;
+    private final AdaptorFactory adaptorFactory;
     private final ObjectMapper objectMapper;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -65,10 +65,11 @@ public class RelayService {
 
         byte[] body = StreamUtils.copyToByteArray(request.getInputStream());
 
+        JsonNode root;
         String model;
         boolean stream;
         try {
-            JsonNode root = objectMapper.readTree(body);
+            root = objectMapper.readTree(body);
             model = root.path("model").asText(null);
             stream = root.path("stream").asBoolean(false);
         } catch (Exception e) {
@@ -78,21 +79,30 @@ public class RelayService {
             throw new RelayException(400, "invalid_request_error", "缺少 model 参数");
         }
 
-        Channel channel = channelService.selectChannelForModel(model);
+        if (!modelAllowed(ctx.getModelLimits(), model)) {
+            throw new RelayException(403, "model_not_allowed", "该 API Key 无权调用模型: " + model);
+        }
+
+        Channel channel = channelService.selectChannelForModel(ctx.getGroup(), model);
         if (channel == null) {
             throw new RelayException(404, "model_not_found", "没有可用渠道支持模型: " + model);
         }
 
-        String url = buildUrl(channel.getBaseUrl(), request.getRequestURI());
+        UpstreamAdaptor adaptor = adaptorFactory.get(channel.getType());
+        String upstreamModel = applyModelMapping(channel, model);
+        String upstreamKey = resolveUpstreamKey(channel);
+        String url = adaptor.buildRequestUrl(channel, request.getRequestURI());
+        byte[] upstreamBody = adaptor.convertRequest(root, upstreamModel, stream);
+
         Usage usage = new Usage();
         int status;
         try {
             status = stream
-                    ? forwardStreaming(url, channel.getApiKey(), body, response, usage)
-                    : forwardBlocking(url, channel.getApiKey(), body, response, usage);
+                    ? forwardStreaming(adaptor, url, upstreamKey, upstreamBody, response, usage)
+                    : forwardBlocking(adaptor, url, upstreamKey, upstreamBody, response, usage);
         } catch (Exception e) {
             log.error("转发上游失败 channel={} url={}: {}", channel.getName(), url, e.getMessage());
-            recordLog(ctx, channel, model, 2, usage, 0L, System.currentTimeMillis() - start, request,
+            recordLog(ctx, channel, model, 2, usage, System.currentTimeMillis() - start, request,
                     "上游请求异常: " + e.getMessage());
             if (!response.isCommitted()) {
                 throw new RelayException(502, "upstream_error", "上游渠道请求失败");
@@ -101,60 +111,114 @@ public class RelayService {
         }
 
         boolean success = status >= 200 && status < 300;
-        long cost = success ? computeQuota(model, usage) : 0L;
-        if (cost > 0) {
-            userService.addUsedQuota(ctx.getUser().getId(), cost);
-            apiKeyService.addUsedQuota(ctx.getApiKey().getId(), cost);
-        }
-        recordLog(ctx, channel, model, success ? 1 : 2, usage, cost,
+        recordLog(ctx, channel, model, success ? 1 : 2, usage,
                 System.currentTimeMillis() - start, request, success ? null : "上游返回状态 " + status);
     }
 
-    private int forwardBlocking(String url, String channelKey, byte[] body,
-                                HttpServletResponse response, Usage usage) throws IOException {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
-                .timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + channelKey)
-                .header("Content-Type", "application/json")
-                .header("Accept", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
-                .build();
-        HttpResponse<byte[]> resp = send(req, HttpResponse.BodyHandlers.ofByteArray());
-        byte[] respBody = resp.body();
-        response.setStatus(resp.statusCode());
-        response.setContentType(resp.headers().firstValue("content-type").orElse("application/json;charset=utf-8"));
-        OutputStream os = response.getOutputStream();
-        os.write(respBody);
-        os.flush();
-        parseUsage(respBody, usage);
-        return resp.statusCode();
+    private boolean modelAllowed(String modelLimits, String model) {
+        if (!StringUtils.hasText(modelLimits)) {
+            return true;
+        }
+        Set<String> allowed = Arrays.stream(modelLimits.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        return allowed.isEmpty() || allowed.contains(model);
     }
 
-    private int forwardStreaming(String url, String channelKey, byte[] body,
-                                 HttpServletResponse response, Usage usage) throws IOException {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+    /** 解析 channel.modelMapping(JSON), 把请求模型名映射为上游模型名;无映射则原样返回。 */
+    private String applyModelMapping(Channel channel, String model) {
+        String mapping = channel.getModelMapping();
+        if (!StringUtils.hasText(mapping)) {
+            return model;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(mapping);
+            JsonNode target = node.get(model);
+            if (target != null && target.isTextual() && StringUtils.hasText(target.asText())) {
+                return target.asText();
+            }
+        } catch (Exception e) {
+            log.warn("解析 channel[{}] modelMapping 失败: {}", channel.getId(), e.getMessage());
+        }
+        return model;
+    }
+
+    /** 取上游 key:支持换行分隔多 key,随机选一个;单 key 直接返回。 */
+    private String resolveUpstreamKey(Channel channel) {
+        String raw = channel.getApiKey();
+        if (!StringUtils.hasText(raw)) {
+            return "";
+        }
+        List<String> keys = Arrays.stream(raw.split("\\r?\\n"))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+        if (keys.isEmpty()) {
+            return raw.trim();
+        }
+        if (keys.size() == 1) {
+            return keys.get(0);
+        }
+        return keys.get(ThreadLocalRandom.current().nextInt(keys.size()));
+    }
+
+    private int forwardBlocking(UpstreamAdaptor adaptor, String url, String upstreamKey, byte[] upstreamBody,
+                                HttpServletResponse response, Usage usage) throws IOException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + channelKey)
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(upstreamBody));
+        adaptor.applyAuthHeaders(builder, upstreamKey);
+        HttpResponse<byte[]> resp = send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
+        int code = resp.statusCode();
+        byte[] clientBody = (code >= 200 && code < 300)
+                ? adaptor.convertResponse(resp.body(), usage)
+                : resp.body();
+        response.setStatus(code);
+        response.setContentType("application/json;charset=utf-8");
+        OutputStream os = response.getOutputStream();
+        os.write(clientBody);
+        os.flush();
+        return code;
+    }
+
+    private int forwardStreaming(UpstreamAdaptor adaptor, String url, String upstreamKey, byte[] upstreamBody,
+                                 HttpServletResponse response, Usage usage) throws IOException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
+                .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
-                .build();
-        HttpResponse<InputStream> resp = send(req, HttpResponse.BodyHandlers.ofInputStream());
-        response.setStatus(resp.statusCode());
-        response.setContentType(resp.headers().firstValue("content-type").orElse("text/event-stream;charset=utf-8"));
-        response.setHeader("Cache-Control", "no-cache");
-        response.setHeader("Connection", "keep-alive");
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
-            PrintWriter writer = response.getWriter();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                writer.write(line);
-                writer.write("\n");
-                writer.flush();
-                captureStreamUsage(line, usage);
+                .POST(HttpRequest.BodyPublishers.ofByteArray(upstreamBody));
+        adaptor.applyAuthHeaders(builder, upstreamKey);
+        HttpResponse<InputStream> resp = send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+        int code = resp.statusCode();
+        response.setStatus(code);
+        if (code >= 200 && code < 300) {
+            response.setContentType("text/event-stream;charset=utf-8");
+            response.setHeader("Cache-Control", "no-cache");
+            response.setHeader("Connection", "keep-alive");
+            StreamState state = new StreamState();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
+                PrintWriter writer = response.getWriter();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String out = adaptor.convertStreamLine(line, usage, state);
+                    if (out != null) {
+                        writer.write(out);
+                        writer.flush();
+                    }
+                }
             }
+        } else {
+            byte[] err = StreamUtils.copyToByteArray(resp.body());
+            response.setContentType("application/json;charset=utf-8");
+            OutputStream os = response.getOutputStream();
+            os.write(err);
+            os.flush();
         }
-        return resp.statusCode();
+        return code;
     }
 
     private <T> HttpResponse<T> send(HttpRequest req, HttpResponse.BodyHandler<T> handler) throws IOException {
@@ -166,56 +230,8 @@ public class RelayService {
         }
     }
 
-    private void parseUsage(byte[] body, Usage usage) {
-        try {
-            JsonNode root = objectMapper.readTree(body);
-            applyUsage(root.get("usage"), usage);
-        } catch (Exception ignore) {
-            // 非 JSON 或无 usage 字段时忽略
-        }
-    }
-
-    private void captureStreamUsage(String line, Usage usage) {
-        if (line == null || !line.startsWith("data:")) {
-            return;
-        }
-        String data = line.substring(5).trim();
-        if (data.isEmpty() || "[DONE]".equals(data)) {
-            return;
-        }
-        try {
-            JsonNode root = objectMapper.readTree(data);
-            applyUsage(root.get("usage"), usage);
-        } catch (Exception ignore) {
-            // 单个分片解析失败忽略
-        }
-    }
-
-    private void applyUsage(JsonNode usageNode, Usage usage) {
-        if (usageNode == null || usageNode.isNull()) {
-            return;
-        }
-        int prompt = usageNode.path("prompt_tokens").asInt(0);
-        int completion = usageNode.path("completion_tokens").asInt(0);
-        usage.promptTokens = prompt;
-        usage.completionTokens = completion;
-        usage.totalTokens = usageNode.path("total_tokens").asInt(prompt + completion);
-    }
-
-    private long computeQuota(String modelName, Usage usage) {
-        Model model = modelService.getByName(modelName);
-        if (model == null) {
-            return 0L;
-        }
-        BigDecimal promptPrice = model.getPromptPrice() == null ? BigDecimal.ZERO : model.getPromptPrice();
-        BigDecimal completionPrice = model.getCompletionPrice() == null ? BigDecimal.ZERO : model.getCompletionPrice();
-        BigDecimal cost = promptPrice.multiply(BigDecimal.valueOf(usage.promptTokens))
-                .add(completionPrice.multiply(BigDecimal.valueOf(usage.completionTokens)));
-        return cost.setScale(0, RoundingMode.CEILING).longValue();
-    }
-
     private void recordLog(RelayContext ctx, Channel channel, String model, int type, Usage usage,
-                           long cost, long durationMs, HttpServletRequest request, String content) {
+                           long durationMs, HttpServletRequest request, String content) {
         try {
             Log logEntry = new Log();
             logEntry.setUserId(ctx.getUser().getId());
@@ -228,7 +244,6 @@ public class RelayService {
             logEntry.setPromptTokens(usage.promptTokens);
             logEntry.setCompletionTokens(usage.completionTokens);
             logEntry.setTotalTokens(usage.totalTokens);
-            logEntry.setQuota(cost);
             logEntry.setDurationMs(durationMs);
             logEntry.setRequestId(UUID.randomUUID().toString());
             logEntry.setIp(getClientIp(request));
@@ -239,14 +254,6 @@ public class RelayService {
         }
     }
 
-    private String buildUrl(String baseUrl, String uri) {
-        String base = baseUrl.trim();
-        while (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        return base + uri;
-    }
-
     private String getClientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (StringUtils.hasText(xff)) {
@@ -254,12 +261,5 @@ public class RelayService {
             return comma > 0 ? xff.substring(0, comma).trim() : xff.trim();
         }
         return request.getRemoteAddr();
-    }
-
-    /** 累计 token 用量 */
-    private static class Usage {
-        int promptTokens;
-        int completionTokens;
-        int totalTokens;
     }
 }

@@ -14,7 +14,4 @@ public interface ApiKeyService extends IService<ApiKey> {
 
     /** relay 鉴权用:按密钥明文查询 */
     ApiKey getByKeyValue(String key);
-
-    /** 累加该 key 的已用额度 */
-    void addUsedQuota(Long id, long delta);
 }

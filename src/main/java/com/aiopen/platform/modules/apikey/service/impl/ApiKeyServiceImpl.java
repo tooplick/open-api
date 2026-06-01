@@ -7,6 +7,7 @@ import com.aiopen.platform.modules.apikey.service.ApiKeyService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.security.SecureRandom;
 import java.util.List;
@@ -25,8 +26,8 @@ public class ApiKeyServiceImpl extends ServiceImpl<ApiKeyMapper, ApiKey> impleme
         apiKey.setName(request.getName());
         apiKey.setApiKey(generateUniqueKey());
         apiKey.setStatus(1);
-        apiKey.setQuota(request.getQuota() == null ? 0L : request.getQuota());
-        apiKey.setUsedQuota(0L);
+        apiKey.setGroup(StringUtils.hasText(request.getGroup()) ? request.getGroup().trim() : "default");
+        apiKey.setModels(request.getModels());
         apiKey.setExpireTime(request.getExpireTime());
         save(apiKey);
         return apiKey;
@@ -42,16 +43,6 @@ public class ApiKeyServiceImpl extends ServiceImpl<ApiKeyMapper, ApiKey> impleme
     @Override
     public ApiKey getByKeyValue(String key) {
         return getOne(Wrappers.<ApiKey>lambdaQuery().eq(ApiKey::getApiKey, key), false);
-    }
-
-    @Override
-    public void addUsedQuota(Long id, long delta) {
-        if (delta == 0) {
-            return;
-        }
-        update(Wrappers.<ApiKey>lambdaUpdate()
-                .setSql("used_quota = used_quota + " + delta)
-                .eq(ApiKey::getId, id));
     }
 
     private String generateUniqueKey() {

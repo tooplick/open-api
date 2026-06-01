@@ -9,5 +9,4 @@ public class LogStatVO {
     private long promptTokens;
     private long completionTokens;
     private long totalTokens;
-    private long quota;
 }

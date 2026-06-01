@@ -29,6 +29,7 @@ const form = reactive<ChannelRequest>({
   baseUrl: '',
   apiKey: '',
   models: '',
+  group: 'default',
   modelMapping: '',
   weight: 1,
   priority: 0,
@@ -70,6 +71,7 @@ function openCreate(): void {
     baseUrl: '',
     apiKey: '',
     models: '',
+    group: 'default',
     modelMapping: '',
     weight: 1,
     priority: 0,
@@ -86,6 +88,7 @@ function openEdit(c: Channel): void {
     baseUrl: c.baseUrl,
     apiKey: '',
     models: c.models,
+    group: c.group,
     modelMapping: c.modelMapping ?? '',
     weight: c.weight,
     priority: c.priority,
@@ -110,6 +113,7 @@ async function submit(): Promise<void> {
     baseUrl: form.baseUrl.trim(),
     apiKey: form.apiKey.trim(),
     models: form.models.trim(),
+    group: form.group.trim() || 'default',
     modelMapping: form.modelMapping?.trim() || undefined,
     weight: Number(form.weight) || 1,
     priority: Number(form.priority) || 0,
@@ -184,6 +188,7 @@ onMounted(() => void load())
               <th>类型</th>
               <th>上游地址</th>
               <th>支持模型</th>
+              <th>分组</th>
               <th>权重</th>
               <th>优先级</th>
               <th>状态</th>
@@ -196,6 +201,7 @@ onMounted(() => void load())
               <td><span class="badge badge-gray">{{ c.type }}</span></td>
               <td class="mono faint">{{ c.baseUrl }}</td>
               <td class="wrap">{{ c.models }}</td>
+              <td class="wrap">{{ c.group }}</td>
               <td>{{ c.weight }}</td>
               <td>{{ c.priority }}</td>
               <td>
@@ -242,15 +248,20 @@ onMounted(() => void load())
       </div>
       <div class="field">
         <label class="field-label">上游密钥<span class="req">*</span></label>
-        <input v-model.trim="form.apiKey" class="input" type="password" placeholder="sk-..." />
+        <textarea v-model.trim="form.apiKey" class="textarea" placeholder="sk-..." />
         <span class="field-hint">
-          {{ editingId ? '出于安全,后端不返回原密钥,编辑保存时需重新填写' : '上游服务商的真实密钥' }}
+          {{ editingId ? '出于安全,后端不返回原密钥,编辑保存时需重新填写' : '上游服务商的真实密钥;可换行填写多个 key(随机轮换)' }}
         </span>
       </div>
       <div class="field">
         <label class="field-label">支持的模型<span class="req">*</span></label>
-        <textarea v-model.trim="form.models" class="textarea" placeholder="gpt-4o,gpt-4o-mini,gpt-3.5-turbo" />
+        <textarea v-model.trim="form.models" class="textarea" placeholder="gpt-4o,gpt-4o-mini,claude-3-5-sonnet" />
         <span class="field-hint">逗号分隔;同一模型多渠道时按优先级取最高,再按权重随机</span>
+      </div>
+      <div class="field">
+        <label class="field-label">分组</label>
+        <input v-model.trim="form.group" class="input" placeholder="default" />
+        <span class="field-hint">逗号分隔可属多组;仅同分组的 API Key 能路由到该渠道</span>
       </div>
       <div class="field">
         <label class="field-label">模型重命名映射</label>

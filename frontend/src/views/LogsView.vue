@@ -94,10 +94,6 @@ onMounted(() => {
         <div class="stat-label">总 Tokens</div>
         <div class="stat-value">{{ formatNumber(stat?.totalTokens) }}</div>
       </div>
-      <div class="card card-pad stat">
-        <div class="stat-label">消耗额度</div>
-        <div class="stat-value">{{ formatNumber(stat?.quota) }}</div>
-      </div>
     </div>
 
     <div class="card card-pad filters">
@@ -146,7 +142,6 @@ onMounted(() => {
               <th>渠道</th>
               <th>状态</th>
               <th>输入 / 输出 / 总</th>
-              <th>额度</th>
               <th>耗时</th>
               <th>内容 / 错误</th>
             </tr>
@@ -166,7 +161,6 @@ onMounted(() => {
                 {{ formatNumber(l.promptTokens) }} / {{ formatNumber(l.completionTokens) }} /
                 {{ formatNumber(l.totalTokens) }}
               </td>
-              <td class="mono">{{ formatNumber(l.quota) }}</td>
               <td class="nowrap">{{ formatNumber(l.durationMs) }} ms</td>
               <td class="wrap faint">{{ l.content || '—' }}</td>
             </tr>
@@ -183,7 +177,7 @@ onMounted(() => {
 <style scoped>
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
   margin-bottom: 24px;
 }

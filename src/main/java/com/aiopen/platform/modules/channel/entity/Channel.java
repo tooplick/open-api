@@ -1,6 +1,7 @@
 package com.aiopen.platform.modules.channel.entity;
 
 import com.aiopen.platform.common.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -23,12 +24,16 @@ public class Channel extends BaseEntity {
     /** 上游地址,如 https://api.openai.com */
     private String baseUrl;
 
-    /** 上游密钥,不对外序列化 */
+    /** 上游密钥(支持多 key,换行分隔),不对外序列化 */
     @JsonIgnore
     private String apiKey;
 
     /** 支持的模型,逗号分隔 */
     private String models;
+
+    /** 分组(逗号分隔,可属多组),group 是 MySQL 保留字 */
+    @TableField("`group`")
+    private String group;
 
     /** 模型重命名映射(JSON),可选 */
     private String modelMapping;

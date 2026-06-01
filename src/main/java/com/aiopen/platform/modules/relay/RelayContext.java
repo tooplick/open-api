@@ -14,4 +14,8 @@ public class RelayContext {
 
     private ApiKey apiKey;
     private User user;
+    /** 分组(取自 apiKey.group),决定可路由到哪些渠道 */
+    private String group;
+    /** 模型白名单(取自 apiKey.models,逗号分隔),空表示不限制 */
+    private String modelLimits;
 }

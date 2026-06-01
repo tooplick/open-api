@@ -35,8 +35,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setEmail(request.getEmail());
         user.setRole(UserContext.ROLE_USER);
         user.setStatus(1);
-        user.setQuota(0L);
-        user.setUsedQuota(0L);
         save(user);
         return user;
     }
@@ -72,15 +70,5 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public User getByUsername(String username) {
         return getOne(Wrappers.<User>lambdaQuery().eq(User::getUsername, username), false);
-    }
-
-    @Override
-    public void addUsedQuota(Long userId, long delta) {
-        if (delta == 0) {
-            return;
-        }
-        update(Wrappers.<User>lambdaUpdate()
-                .setSql("used_quota = used_quota + " + delta)
-                .eq(User::getId, userId));
     }
 }

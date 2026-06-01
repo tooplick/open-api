@@ -16,7 +16,4 @@ public interface UserService extends IService<User> {
     void changePassword(Long userId, ChangePasswordRequest request);
 
     User getByUsername(String username);
-
-    /** 累加用户已用额度 */
-    void addUsedQuota(Long userId, long delta);
 }

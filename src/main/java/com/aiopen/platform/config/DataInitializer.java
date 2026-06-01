@@ -31,8 +31,6 @@ public class DataInitializer implements CommandLineRunner {
         admin.setEmail("admin@example.com");
         admin.setRole(UserContext.ROLE_ADMIN);
         admin.setStatus(1);
-        admin.setQuota(0L);
-        admin.setUsedQuota(0L);
         userService.save(admin);
         log.info("已创建默认管理员账号: admin / admin (请尽快修改密码)");
     }

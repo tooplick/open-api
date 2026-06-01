@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { logStatistics } from '@/api/log'
 import type { LogStat } from '@/types'
-import { formatNumber, formatQuota } from '@/utils/format'
+import { formatNumber } from '@/utils/format'
 
 const auth = useAuthStore()
 const stat = ref<LogStat | null>(null)
@@ -44,7 +44,6 @@ function pick(key: 'all' | '7d' | '30d'): void {
 
 onMounted(() => {
   void load()
-  // 顺带刷新一次本人额度信息
   void auth.refreshMe().catch(() => undefined)
 })
 </script>
@@ -88,10 +87,6 @@ onMounted(() => {
           {{ formatNumber(stat?.completionTokens) }}
         </div>
       </div>
-      <div class="card card-pad stat">
-        <div class="stat-label">消耗额度(点数)</div>
-        <div class="stat-value">{{ formatNumber(stat?.quota) }}</div>
-      </div>
     </div>
 
     <div class="dash-cols">
@@ -102,10 +97,6 @@ onMounted(() => {
           <span :class="['badge', auth.isAdmin ? 'badge-indigo' : 'badge-gray']">
             {{ auth.isAdmin ? '管理员' : '普通用户' }}
           </span>
-        </div>
-        <div class="kv">
-          <span class="muted">额度(已用 / 总)</span>
-          <span class="mono">{{ formatQuota(auth.user?.usedQuota, auth.user?.quota) }}</span>
         </div>
         <div class="kv">
           <span class="muted">邮箱</span>
@@ -154,7 +145,7 @@ onMounted(() => {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
   margin-bottom: 24px;
 }

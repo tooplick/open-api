@@ -1,7 +1,7 @@
 -- ============================================================
 -- AI Open Platform  数据库初始化脚本 (MySQL 8.0+)
 -- 字符集 utf8mb4, 引擎 InnoDB
--- 额度(quota)单位为抽象"点数",由模型价格 * token 数计算消耗
+-- 不计费: 仅记录 token 用量, 不做额度限制
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `ai_open_platform`
@@ -22,8 +22,6 @@ CREATE TABLE `user`
     `email`       VARCHAR(100) DEFAULT NULL COMMENT '邮箱',
     `role`        VARCHAR(20)  NOT NULL DEFAULT 'user' COMMENT '角色: admin / user',
     `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0禁用',
-    `quota`       BIGINT       NOT NULL DEFAULT 0 COMMENT '总额度(点数)',
-    `used_quota`  BIGINT       NOT NULL DEFAULT 0 COMMENT '已用额度(点数)',
     `create_time` DATETIME     DEFAULT NULL COMMENT '创建时间',
     `update_time` DATETIME     DEFAULT NULL COMMENT '更新时间',
     `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0未删 1已删',
@@ -43,8 +41,8 @@ CREATE TABLE `api_key`
     `name`        VARCHAR(100) DEFAULT NULL COMMENT '名称/备注',
     `api_key`     VARCHAR(64)  NOT NULL COMMENT '密钥(sk- 开头)',
     `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0禁用',
-    `quota`       BIGINT       NOT NULL DEFAULT 0 COMMENT '独立额度上限, 0表示不单独限额(跟随用户)',
-    `used_quota`  BIGINT       NOT NULL DEFAULT 0 COMMENT '该 key 已用额度',
+    `group`       VARCHAR(64)  NOT NULL DEFAULT 'default' COMMENT '分组(决定可路由到哪些渠道)',
+    `models`      VARCHAR(500) DEFAULT NULL COMMENT '模型白名单(逗号分隔), 空表示不限制',
     `expire_time` DATETIME     DEFAULT NULL COMMENT '过期时间, NULL 表示永不过期',
     `create_time` DATETIME     DEFAULT NULL COMMENT '创建时间',
     `update_time` DATETIME     DEFAULT NULL COMMENT '更新时间',
@@ -65,8 +63,9 @@ CREATE TABLE `channel`
     `name`          VARCHAR(100) NOT NULL COMMENT '渠道名称',
     `type`          VARCHAR(32)  NOT NULL DEFAULT 'openai' COMMENT '渠道类型: openai/azure/anthropic 等',
     `base_url`      VARCHAR(255) NOT NULL COMMENT '上游地址, 如 https://api.openai.com',
-    `api_key`       VARCHAR(512) NOT NULL COMMENT '上游密钥',
+    `api_key`       TEXT         NOT NULL COMMENT '上游密钥(支持多 key, 换行分隔)',
     `models`        TEXT         DEFAULT NULL COMMENT '支持的模型, 逗号分隔',
+    `group`         VARCHAR(255) NOT NULL DEFAULT 'default' COMMENT '分组(逗号分隔, 可属多组)',
     `model_mapping` TEXT         DEFAULT NULL COMMENT '模型重命名映射(JSON), 可选',
     `status`        TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0禁用',
     `weight`        INT          NOT NULL DEFAULT 1 COMMENT '权重(同优先级内按权重随机)',
@@ -80,26 +79,23 @@ CREATE TABLE `channel`
   DEFAULT CHARSET = utf8mb4 COMMENT ='渠道表';
 
 -- ---------------------------
--- 模型表(模型元信息与计费)
+-- 能力表(渠道 group x models 笛卡尔展开, 路由用; 由渠道增改自动维护)
 -- ---------------------------
-DROP TABLE IF EXISTS `model`;
-CREATE TABLE `model`
+DROP TABLE IF EXISTS `ability`;
+CREATE TABLE `ability`
 (
-    `id`               BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `model_name`       VARCHAR(100)  NOT NULL COMMENT '模型标识, 如 gpt-4o',
-    `display_name`     VARCHAR(100)  DEFAULT NULL COMMENT '展示名',
-    `type`             VARCHAR(32)   NOT NULL DEFAULT 'chat' COMMENT '类型: chat/embedding/image',
-    `prompt_price`     DECIMAL(12, 6) NOT NULL DEFAULT 0 COMMENT '输入每 token 消耗点数',
-    `completion_price` DECIMAL(12, 6) NOT NULL DEFAULT 0 COMMENT '输出每 token 消耗点数',
-    `status`           TINYINT       NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0禁用',
-    `remark`           VARCHAR(255)  DEFAULT NULL COMMENT '备注',
-    `create_time`      DATETIME      DEFAULT NULL COMMENT '创建时间',
-    `update_time`      DATETIME      DEFAULT NULL COMMENT '更新时间',
-    `deleted`          TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+    `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `group`      VARCHAR(64)  NOT NULL COMMENT '分组',
+    `model`      VARCHAR(100) NOT NULL COMMENT '模型',
+    `channel_id` BIGINT       NOT NULL COMMENT '渠道ID',
+    `enabled`    TINYINT      NOT NULL DEFAULT 1 COMMENT '是否可用: 跟随渠道状态',
+    `priority`   INT          NOT NULL DEFAULT 0 COMMENT '优先级(拷贝自渠道)',
+    `weight`     INT          NOT NULL DEFAULT 1 COMMENT '权重(拷贝自渠道)',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_model_name` (`model_name`)
+    UNIQUE KEY `uk_grp_model_chan` (`group`, `model`, `channel_id`),
+    KEY `idx_grp_model_enabled` (`group`, `model`, `enabled`)
 ) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4 COMMENT ='模型表';
+  DEFAULT CHARSET = utf8mb4 COMMENT ='渠道能力路由表';
 
 -- ---------------------------
 -- 调用日志表(不做逻辑删除,无 deleted 字段)
@@ -118,7 +114,6 @@ CREATE TABLE `log`
     `prompt_tokens`     INT          NOT NULL DEFAULT 0 COMMENT '输入 token',
     `completion_tokens` INT          NOT NULL DEFAULT 0 COMMENT '输出 token',
     `total_tokens`      INT          NOT NULL DEFAULT 0 COMMENT '总 token',
-    `quota`             BIGINT       NOT NULL DEFAULT 0 COMMENT '本次消耗点数',
     `duration_ms`       BIGINT       NOT NULL DEFAULT 0 COMMENT '耗时(毫秒)',
     `request_id`        VARCHAR(64)  DEFAULT NULL COMMENT '请求ID',
     `ip`                VARCHAR(64)  DEFAULT NULL COMMENT '客户端IP',
@@ -133,10 +128,6 @@ CREATE TABLE `log`
   DEFAULT CHARSET = utf8mb4 COMMENT ='调用日志表';
 
 -- ---------------------------
--- 预置常见模型(价格为 0, 即默认不计费; 可按需修改)
 -- 管理员账号由应用启动时自动创建(见 DataInitializer): admin / admin
+-- 模型不再手动维护, 由各渠道的 models 字段聚合得到
 -- ---------------------------
-INSERT INTO `model` (`model_name`, `display_name`, `type`, `prompt_price`, `completion_price`, `status`, `create_time`, `update_time`)
-VALUES ('gpt-4o', 'GPT-4o', 'chat', 0, 0, 1, NOW(), NOW()),
-       ('gpt-4o-mini', 'GPT-4o mini', 'chat', 0, 0, 1, NOW(), NOW()),
-       ('gpt-3.5-turbo', 'GPT-3.5 Turbo', 'chat', 0, 0, 1, NOW(), NOW());

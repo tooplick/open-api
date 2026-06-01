@@ -3,7 +3,7 @@ import { reactive, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { changePassword } from '@/api/user'
 import { toast } from '@/composables/useToast'
-import { formatDateTime, formatQuota } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 
 const auth = useAuthStore()
 const form = reactive({ oldPassword: '', newPassword: '', confirm: '' })
@@ -52,10 +52,6 @@ async function submit(): Promise<void> {
       </div>
       <div class="kv">
         <span class="muted">邮箱</span><span>{{ auth.user?.email || '—' }}</span>
-      </div>
-      <div class="kv">
-        <span class="muted">额度(已用 / 总)</span>
-        <span class="mono">{{ formatQuota(auth.user?.usedQuota, auth.user?.quota) }}</span>
       </div>
       <div class="kv">
         <span class="muted">注册时间</span><span>{{ formatDateTime(auth.user?.createTime) }}</span>

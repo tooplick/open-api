@@ -40,9 +40,6 @@ public class Log implements Serializable {
 
     private Integer totalTokens;
 
-    /** 本次消耗点数 */
-    private Long quota;
-
     /** 耗时(毫秒) */
     private Long durationMs;
 

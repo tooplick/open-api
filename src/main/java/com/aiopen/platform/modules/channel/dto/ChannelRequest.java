@@ -22,6 +22,9 @@ public class ChannelRequest {
     @NotBlank(message = "支持的模型不能为空")
     private String models;
 
+    /** 分组,逗号分隔,可属多组 */
+    private String group = "default";
+
     private String modelMapping;
 
     private Integer weight = 1;
