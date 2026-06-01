@@ -104,7 +104,7 @@ export interface ChannelRequest {
   name: string
   type: string
   baseUrl: string
-  /** 上游密钥(只写,支持换行分隔多 key) */
+  /** 上游密钥(只写,支持换行分隔多 key)。编辑时留空表示沿用库中原密钥 */
   apiKey: string
   models: string
   /** 分组,逗号分隔,可属多组 */
@@ -113,6 +113,14 @@ export interface ChannelRequest {
   weight: number
   priority: number
   status: number
+}
+
+/** 拉取上游模型列表入参 */
+export interface FetchModelsRequest {
+  baseUrl: string
+  /** 留空且带 id 时,后端用库中该渠道的原密钥 */
+  apiKey?: string
+  id?: number | null
 }
 
 // ---------- 日志 ----------

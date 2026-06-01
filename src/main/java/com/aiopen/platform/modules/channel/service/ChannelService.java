@@ -1,14 +1,20 @@
 package com.aiopen.platform.modules.channel.service;
 
 import com.aiopen.platform.modules.channel.dto.ChannelRequest;
+import com.aiopen.platform.modules.channel.dto.FetchModelsRequest;
 import com.aiopen.platform.modules.channel.entity.Channel;
 import com.baomidou.mybatisplus.extension.service.IService;
+
+import java.util.List;
 
 public interface ChannelService extends IService<Channel> {
 
     Channel createChannel(ChannelRequest request);
 
     void updateChannel(Long id, ChannelRequest request);
+
+    /** 用 baseUrl + 密钥请求上游 GET /v1/models,返回去重排序后的模型 id 列表 */
+    List<String> fetchUpstreamModels(FetchModelsRequest request);
 
     /** 更新渠道启用状态,并同步能力表 */
     void updateStatus(Long id, Integer status);

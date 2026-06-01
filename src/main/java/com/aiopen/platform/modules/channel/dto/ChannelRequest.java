@@ -15,7 +15,7 @@ public class ChannelRequest {
     @NotBlank(message = "上游地址不能为空")
     private String baseUrl;
 
-    @NotBlank(message = "上游密钥不能为空")
+    /** 上游密钥。新建必填;编辑留空表示沿用库中原密钥(由 Service 校验) */
     private String apiKey;
 
     /** 支持的模型,逗号分隔 */

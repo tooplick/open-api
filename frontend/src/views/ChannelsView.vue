@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
   createChannel,
   deleteChannel,
+  fetchChannelModels,
   pageChannels,
   updateChannel,
   updateChannelStatus,
@@ -23,6 +24,8 @@ const search = ref('')
 const showForm = ref(false)
 const saving = ref(false)
 const editingId = ref<number | null>(null)
+const fetchedModels = ref<string[]>([])
+const fetchingModels = ref(false)
 const form = reactive<ChannelRequest>({
   name: '',
   type: 'openai',
@@ -35,6 +38,61 @@ const form = reactive<ChannelRequest>({
   priority: 0,
   status: 1,
 })
+
+function parseModels(csv: string): string[] {
+  return csv
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+const selectedSet = computed(() => new Set(parseModels(form.models)))
+const allFetchedSelected = computed(
+  () => fetchedModels.value.length > 0 && fetchedModels.value.every((m) => selectedSet.value.has(m)),
+)
+
+function toggleModel(m: string): void {
+  const set = new Set(parseModels(form.models))
+  if (set.has(m)) set.delete(m)
+  else set.add(m)
+  form.models = Array.from(set).join(',')
+}
+
+function toggleSelectAll(): void {
+  const set = new Set(parseModels(form.models))
+  if (allFetchedSelected.value) {
+    fetchedModels.value.forEach((m) => set.delete(m))
+  } else {
+    fetchedModels.value.forEach((m) => set.add(m))
+  }
+  form.models = Array.from(set).join(',')
+}
+
+async function doFetchModels(): Promise<void> {
+  if (!form.baseUrl.trim()) {
+    toast.error('请先填写上游地址')
+    return
+  }
+  if (!editingId.value && !form.apiKey.trim()) {
+    toast.error('请先填写上游密钥')
+    return
+  }
+  fetchingModels.value = true
+  try {
+    const models = await fetchChannelModels({
+      baseUrl: form.baseUrl.trim(),
+      apiKey: form.apiKey.trim() || undefined,
+      id: editingId.value ?? undefined,
+    })
+    fetchedModels.value = models
+    if (models.length === 0) toast.info('上游未返回模型列表')
+    else toast.success(`获取到 ${models.length} 个模型,勾选需要的模型`)
+  } catch {
+    // 拦截器已提示
+  } finally {
+    fetchingModels.value = false
+  }
+}
 
 async function load(): Promise<void> {
   loading.value = true
@@ -65,6 +123,7 @@ function goPage(p: number): void {
 
 function openCreate(): void {
   editingId.value = null
+  fetchedModels.value = []
   Object.assign(form, {
     name: '',
     type: 'openai',
@@ -82,6 +141,7 @@ function openCreate(): void {
 
 function openEdit(c: Channel): void {
   editingId.value = c.id
+  fetchedModels.value = []
   Object.assign(form, {
     name: c.name,
     type: c.type,
@@ -102,8 +162,8 @@ async function submit(): Promise<void> {
     toast.error('请填写名称、上游地址与支持的模型')
     return
   }
-  if (!form.apiKey.trim()) {
-    toast.error(editingId.value ? '编辑时需重新填写上游密钥' : '请填写上游密钥')
+  if (!editingId.value && !form.apiKey.trim()) {
+    toast.error('请填写上游密钥')
     return
   }
   saving.value = true
@@ -226,20 +286,10 @@ onMounted(() => void load())
     </div>
 
     <BaseModal :open="showForm" :title="editingId ? '编辑渠道' : '新建渠道'" width="560px" @close="showForm = false">
-      <div class="grid2">
-        <div class="field">
-          <label class="field-label">渠道名称<span class="req">*</span></label>
-          <input v-model.trim="form.name" class="input" placeholder="如:OpenAI 官方" />
-        </div>
-        <div class="field">
-          <label class="field-label">类型</label>
-          <select v-model="form.type" class="select">
-            <option value="openai">openai</option>
-            <option value="azure">azure</option>
-            <option value="anthropic">anthropic</option>
-            <option value="custom">custom</option>
-          </select>
-        </div>
+      <div class="field">
+        <label class="field-label">渠道名称<span class="req">*</span></label>
+        <input v-model.trim="form.name" class="input" placeholder="如:OpenAI 官方" />
+        <span class="field-hint">渠道按 OpenAI 兼容协议接入上游(/v1/chat/completions)</span>
       </div>
       <div class="field">
         <label class="field-label">上游地址<span class="req">*</span></label>
@@ -247,15 +297,45 @@ onMounted(() => void load())
         <span class="field-hint">填根地址(不含 /v1),平台转发时自动拼接请求路径</span>
       </div>
       <div class="field">
-        <label class="field-label">上游密钥<span class="req">*</span></label>
-        <textarea v-model.trim="form.apiKey" class="textarea" placeholder="sk-..." />
+        <label class="field-label">上游密钥<span v-if="!editingId" class="req">*</span></label>
+        <textarea
+          v-model.trim="form.apiKey"
+          class="textarea"
+          :placeholder="editingId ? '留空则沿用库中原密钥' : 'sk-...'"
+        />
         <span class="field-hint">
-          {{ editingId ? '出于安全,后端不返回原密钥,编辑保存时需重新填写' : '上游服务商的真实密钥;可换行填写多个 key(随机轮换)' }}
+          {{
+            editingId
+              ? '出于安全后端不返回原密钥;留空则沿用库中原密钥,如需更换或重新获取模型请填写'
+              : '上游服务商的真实密钥;可换行填写多个 key(随机轮换)'
+          }}
         </span>
       </div>
       <div class="field">
         <label class="field-label">支持的模型<span class="req">*</span></label>
-        <textarea v-model.trim="form.models" class="textarea" placeholder="gpt-4o,gpt-4o-mini,claude-3-5-sonnet" />
+        <div class="row gap-8" style="margin-bottom: 12px; flex-wrap: wrap">
+          <button class="btn btn-sm" type="button" :disabled="fetchingModels" @click="doFetchModels">
+            <span v-if="fetchingModels" class="spinner" />
+            <span v-else>获取模型</span>
+          </button>
+          <button v-if="fetchedModels.length" class="btn btn-sm" type="button" @click="toggleSelectAll">
+            {{ allFetchedSelected ? '取消全选' : '全选' }}
+          </button>
+          <span v-if="fetchedModels.length" class="field-hint" style="align-self: center; margin: 0">
+            已选 {{ selectedSet.size }} / 获取 {{ fetchedModels.length }}
+          </span>
+        </div>
+        <div v-if="fetchedModels.length" class="model-grid">
+          <label v-for="m in fetchedModels" :key="m" class="model-item">
+            <input type="checkbox" :checked="selectedSet.has(m)" @change="toggleModel(m)" />
+            <span class="mono">{{ m }}</span>
+          </label>
+        </div>
+        <textarea
+          v-model.trim="form.models"
+          class="textarea"
+          placeholder="gpt-4o,gpt-4o-mini(可“获取模型”后多选/全选,或在此手动逗号分隔)"
+        />
         <span class="field-hint">逗号分隔;同一模型多渠道时按优先级取最高,再按权重随机</span>
       </div>
       <div class="field">
@@ -306,6 +386,32 @@ onMounted(() => void load())
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 18px;
+}
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px 18px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+.model-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  overflow: hidden;
+}
+.model-item .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @media (max-width: 560px) {
   .grid2,

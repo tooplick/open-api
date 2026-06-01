@@ -3,6 +3,7 @@ package com.aiopen.platform.modules.channel.controller;
 import com.aiopen.platform.common.result.PageResult;
 import com.aiopen.platform.common.result.Result;
 import com.aiopen.platform.modules.channel.dto.ChannelRequest;
+import com.aiopen.platform.modules.channel.dto.FetchModelsRequest;
 import com.aiopen.platform.modules.channel.entity.Channel;
 import com.aiopen.platform.modules.channel.service.ChannelService;
 import com.aiopen.platform.security.UserContext;
@@ -12,6 +13,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 渠道管理(仅管理员)。
@@ -46,6 +49,12 @@ public class ChannelController {
     public Result<Channel> create(@Valid @RequestBody ChannelRequest request) {
         UserContext.requireAdmin();
         return Result.success(channelService.createChannel(request));
+    }
+
+    @PostMapping("/fetch-models")
+    public Result<List<String>> fetchModels(@Valid @RequestBody FetchModelsRequest request) {
+        UserContext.requireAdmin();
+        return Result.success(channelService.fetchUpstreamModels(request));
     }
 
     @PutMapping("/{id}")

@@ -12,7 +12,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 
 /**
- * relay 的 API Key 鉴权。不计费, 仅校验 key 有效性与账号状态。
+ * relay 的 API Key 鉴权, 仅校验 key 有效性与账号状态。
  */
 @Service
 @RequiredArgsConstructor
@@ -27,7 +27,16 @@ public class RelayAuthService {
         if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith(BEARER)) {
             throw new RelayException(401, "invalid_request_error", "缺少有效的 Authorization Bearer 令牌");
         }
-        String key = authorizationHeader.substring(BEARER.length()).trim();
+        return authenticateKey(authorizationHeader.substring(BEARER.length()).trim());
+    }
+
+    /**
+     * 用裸 API Key 鉴权(供 Anthropic 入站接口用 x-api-key 头时复用)。
+     */
+    public RelayContext authenticateKey(String key) {
+        if (!StringUtils.hasText(key)) {
+            throw new RelayException(401, "invalid_request_error", "缺少 API Key");
+        }
         ApiKey apiKey = apiKeyService.getByKeyValue(key);
         if (apiKey == null) {
             throw new RelayException(401, "invalid_api_key", "API Key 无效");
