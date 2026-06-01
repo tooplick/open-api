@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-AI Open Platform — a backend gateway that aggregates multiple LLM providers behind a single **OpenAI-compatible** API. Spring Boot 3 + MyBatis-Plus + MySQL 8. Currently backend MVP only; frontend (Vue3+Vite+TS) is a future phase.
+AI Open Platform — a gateway that aggregates multiple LLM providers behind a single **OpenAI-compatible** API. Backend (`src/main/...`): Spring Boot 3 + MyBatis-Plus + MySQL 8. Frontend console (`frontend/`): Vue 3 + Vite + TypeScript. The two are developed and run separately (frontend dev server proxies to the backend).
 
-## Commands
+## Backend commands
 
 ```bash
 # Compile (fast sanity check)
@@ -65,5 +65,35 @@ Quota is an abstract "points" unit. `model.promptPrice`/`completionPrice` are **
 
 ### Module layout
 `com.aiopen.platform.modules.<feature>` with `{entity, mapper, dto, service, service.impl, controller}`. Cross-cutting code lives in `common/` (Result, exceptions, BaseEntity), `config/` (MyBatis-Plus, JWT props, CORS+interceptors, crypto, data init), and `security/` (JwtUtil, UserContext, AuthInterceptor).
+
+## Frontend (`frontend/`)
+
+Vue 3 + Vite + TypeScript SPA — **Pinia** (state), **Vue Router**, **axios** (HTTP). Components are **hand-written by design; do NOT add a UI component library** (Element Plus / Ant Design Vue, etc.). This is a standing project decision — Pinia/axios/Vue Router are fine, but UI widgets (tables, modals, pagination, toasts) are built by hand in `src/components/`.
+
+### Frontend commands
+```bash
+cd frontend
+npm install
+npm run dev        # dev server :5173; proxies /api and /v1 -> localhost:8080 (vite.config.ts)
+npm run build      # runs `vue-tsc --noEmit` THEN `vite build` — typecheck is part of the build
+npm run typecheck  # vue-tsc --noEmit only
+```
+No frontend test runner exists. The build fails on type errors **and** on unused locals/params (`noUnusedLocals`/`noUnusedParameters` are on in `tsconfig.json`). All API calls use relative paths because of the dev proxy.
+
+### The axios layer mirrors the backend's two response conventions (most important)
+`src/api/http.ts` is the linchpin. Its `get/post/put/del` helpers **unwrap the `Result<T>` envelope** and return `.data.data`, so `api/*.ts` modules and views receive plain typed data. Error handling tracks the backend's split (see "Two independent auth domains" above):
+- **HTTP 401** (missing/invalid JWT, emitted by `AuthInterceptor`) → `forceLogout()` clears the store and redirects to `/login`.
+- **HTTP 200 with `body.code !== 200`** (business exceptions incl. `403`/quota, from `GlobalExceptionHandler`) → rejected as an `ApiError` plus an error toast.
+
+So a forbidden or quota error is **not** an HTTP error — it is a 200 the interceptor must inspect by `code`.
+
+### Global singletons, not provide/inject
+`composables/useToast.ts` (`toast.success/error/info`) and `composables/useConfirm.ts` (`confirmDialog()` returning `Promise<boolean>`) are module-level reactive singletons callable from anywhere — including the axios interceptor. Their hosts (`ToastHost.vue`, `ConfirmHost.vue`) are mounted once in `App.vue`.
+
+### Auth, routing, and an intentional import cycle
+`stores/auth.ts` persists `token`+`user` to localStorage; the storage keys live in `utils/constants.ts`. That constants file exists specifically to break a module init-order hazard: `http.ts ↔ stores/auth.ts ↔ router/index.ts` form an import cycle that is safe **only because the cross-references run at call time, not at module load** — keep it that way. The router guard (`router/index.ts`) enforces login and `meta.admin`-gated routes; `AppLayout.vue` hides admin nav items. **Frontend role checks are convenience only — the backend re-checks every admin action.**
+
+### Editing a channel re-requires the upstream key
+Because `channel.apiKey` is `@JsonIgnore` (never serialized back), the channel edit form opens with a blank key field and the admin must re-enter the upstream key on every save (`ChannelRequest.apiKey` is `@NotBlank`). This frontend behavior is dictated by that backend constraint.
 
 See `README.md` for the full endpoint table and a curl walkthrough (login → create channel → create key → call `/v1/chat/completions`).

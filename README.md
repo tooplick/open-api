@@ -4,7 +4,7 @@
 
 统一接入多个大模型服务商,对外提供 **OpenAI 兼容** 的标准接口,支持渠道管理、模型管理、API Key、额度与日志统计。用户无需分别对接各家服务商,只需调用本平台的统一接口。
 
-> 当前为后端 MVP。前端(Vue3 + Vite + TS)后续补充。
+> 后端 MVP 已完成;前端控制台(Vue3 + Vite + TS)已实现,见下方「前端控制台」。
 
 ---
 
@@ -211,7 +211,54 @@ src/main/java/com/aiopen/platform
 src/main/resources
 ├── application.yml
 └── db/schema.sql  # 建表脚本
+
+frontend/          # 控制台前端(Vue3 + Vite + TS,详见「前端控制台」)
+├── src/api/       # axios 封装 + 各模块接口
+├── src/stores/    # pinia(鉴权状态)
+├── src/router/    # 路由 + 登录/管理员守卫
+├── src/components/# 手写基础组件(布局、弹窗、分页、Toast…)
+└── src/views/     # 各功能页面
 ```
+
+---
+
+## 前端控制台(Vue3 + Vite + TS)
+
+控制台前端位于 `frontend/`,技术栈 **Vue 3 + Vite + TypeScript + Pinia + Vue Router + axios**,UI 组件全部手写,未引入 UI 组件库。
+
+### 运行
+
+```bash
+cd frontend
+npm install
+npm run dev        # 开发服务器 http://localhost:5173
+```
+
+开发态已配置反向代理:`/api` 与 `/v1` 自动转发到后端 `http://localhost:8080`(见 `vite.config.ts`),前端统一用相对路径请求,无需关心跨域。请先启动后端。
+
+### 构建
+
+```bash
+npm run build      # 先类型检查(vue-tsc)再打包到 frontend/dist
+npm run preview    # 本地预览构建产物
+```
+
+将 `dist/` 交给任意静态服务器托管即可;生产环境需把 `/api`、`/v1` 反代到后端服务。
+
+### 功能页面
+
+| 页面 | 说明 | 权限 |
+| --- | --- | --- |
+| 登录 / 注册 | JWT 登录、注册新用户 | 公开 |
+| 概览 | 用量统计(请求数 / Tokens / 额度)、账户额度、快捷入口 | 登录 |
+| API Key | 创建 / 启停 / 删除 / 复制,设独立额度与过期时间 | 登录 |
+| 模型 | 分页查看;管理员可增删改与定价 | 登录(改:管理员) |
+| 渠道管理 | 接入上游服务商,增删改启停 | 管理员 |
+| 用户管理 | 分页、启停、设额度 | 管理员 |
+| 调用日志 | 多条件筛选 + 用量汇总 | 登录(普通用户仅本人) |
+| 个人资料 | 账户信息、修改密码 | 登录 |
+
+> 菜单按角色显示:管理员可见全部菜单与全局数据,普通用户仅见自助菜单与本人数据(前端隐藏入口,后端二次校验)。
 
 ---
 
@@ -224,7 +271,7 @@ src/main/resources
 
 ## 后续规划(MVP 之外)
 
-- 前端控制台(Vue3 + Vite + TS)
+- 前端控制台(Vue3 + Vite + TS)✅ 已实现
 - 渠道连通性测试、模型重命名映射生效
 - Redis:令牌黑名单、限流、额度缓存
 - 更多端点(embeddings、images)与更多渠道类型(Azure、Anthropic)适配
