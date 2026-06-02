@@ -1,21 +1,21 @@
 package com.aiopen.platform.modules.ability.service.impl;
 
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
 import com.aiopen.platform.modules.ability.entity.Ability;
 import com.aiopen.platform.modules.ability.mapper.AbilityMapper;
 import com.aiopen.platform.modules.ability.service.AbilityService;
 import com.aiopen.platform.modules.channel.entity.Channel;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class AbilityServiceImpl extends ServiceImpl<AbilityMapper, Ability> implements AbilityService {
