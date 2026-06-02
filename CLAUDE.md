@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-AI Open Platform — a gateway that aggregates multiple LLM providers behind a single **OpenAI-compatible** API. Backend (`src/main/...`): Spring Boot 3 + MyBatis-Plus + MySQL 8. Frontend console (`frontend/`): Vue 3 + Vite + TypeScript. The two are developed and run separately (frontend dev server proxies to the backend). **There is no billing/quota** — the platform records token usage in the `log` table but never meters, charges, or limits by cost.
+AI Open Platform — a gateway that aggregates multiple LLM providers behind a single **OpenAI-compatible** API. Backend (`src/main/...`): Spring Boot 3 + MyBatis-Plus + MySQL 8. Frontend console (`frontend/`): Vue 3 + Vite + TypeScript. In **development** the two run separately (the Vite dev server proxies `/api`, `/v1`, `/anthropic` to the backend); for **containerized deployment** they collapse into one image — the Vue build is bundled into the backend jar and served by Spring Boot (see *Docker / deployment (single image)*). **There is no billing/quota** — the platform records token usage in the `log` table but never meters, charges, or limits by cost.
 
 ## Backend commands
 
@@ -109,3 +109,12 @@ So a forbidden error is **not** an HTTP error — it is a 200 the interceptor mu
 `ModelsView` is **read-only** (there is no create/update/delete) — it lists the aggregated available models from `/api/models` (a `string[]`). The channel form includes `group` and a `type` dropdown (openai/anthropic/...); the API Key form includes `group` and an optional `models` whitelist. Because `channel.apiKey` is `@JsonIgnore` (never serialized back), the channel edit form opens with a blank key field and the admin must re-enter the upstream key on every save (`ChannelRequest.apiKey` is `@NotBlank`); the field accepts newline-separated multiple keys.
 
 See `README.md` for an endpoint table and a curl walkthrough (note: parts of it predate the no-billing / channel-derived-models refactor and may be stale).
+
+## Docker / deployment (single image)
+
+Deployment is **front-back combined** (matching the `new-api` blueprint): one image runs the whole platform, MySQL is the only separate container. `docker compose up -d --build` starts two services — `app` and `mysql` — and the Vue UI plus `/api`, `/v1`, `/anthropic` are all served on **port 8080** (same origin, so no CORS in prod). Local dev is unchanged: `npm run dev` + the Vite proxy still runs the two halves separately; only the container build bundles them.
+
+- **Three-stage `Dockerfile`**: (1) `node` builds the Vue app; (2) `maven` copies that `dist/` into `src/main/resources/static/` *before* `mvn package`, baking the SPA into the fat jar; (3) `eclipse-temurin:17-jre` runs it. Building with JDK 17 in the image sidesteps the JDK 24 Lombok problem entirely. The root `.dockerignore` lets `frontend/` source into the build context but excludes `frontend/node_modules` and `frontend/dist`.
+- **Spring Boot serves the SPA** via `WebConfig.addResourceHandlers`: `/**` → `classpath:/static/` with a `PathResourceResolver` that falls back to `index.html` for unmatched paths **except** those starting `api/`, `v1/`, `anthropic/` (those return `null`, preserving real routing/404 instead of being handed HTML). This is what lets Vue's `createWebHistory` deep links survive a hard refresh — don't drop the guard, or unknown API paths start returning the SPA page.
+- **Config is env-only, no source edits**: compose overrides `application.yml` through `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` (Spring relaxed binding) to point at the `mysql` service, plus `AIOPEN_JWT_SECRET`. `application.yml` still targets `localhost` for non-Docker runs.
+- **Schema bootstraps once**: `schema.sql` is bind-mounted into MySQL's `/docker-entrypoint-initdb.d/` and runs **only when the data volume is empty** (the app inserts the admin row but never creates tables, so tables must pre-exist). `app` gates on a MySQL `service_healthy` healthcheck. Since `schema.sql` is `DROP`+`CREATE`, re-initializing means dropping the volume: `docker compose down -v`.
