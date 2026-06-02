@@ -43,6 +43,6 @@ npm run build      # 先 vue-tsc 类型检查,再 vite build(类型/未用变量
 - **不加计费 / 配额**:平台只记录用量。
 - **`schema.sql` 是 `DROP` + `CREATE`**:重跑会清库,无迁移脚本;演进既有库请手写 `ALTER`。
 - **Lombok 注解处理是关键配置**:`pom.xml` 中 `maven-compiler-plugin` 的 `annotationProcessorPaths`(Lombok 1.18.38)不可删 —— JDK 23+ 删掉它会让所有 Lombok 生成代码静默失效。
-- **两套独立鉴权域**:`/api/**`(JWT,`Result` 包裹,业务错误是 HTTP 200 + `code != 200`) vs `/v1`、`/anthropic`(平台 API Key,透传上游、保持 OpenAI / Anthropic 原始形状)。
+- **两套独立鉴权域**:`/api/**`(**Spring Security 6** + JWT,`Result` 包裹,业务错误是 HTTP 200 + `code != 200`,基于角色的无权限是真实 HTTP 403) vs `/v1`、`/anthropic`(平台 API Key,透传上游、保持 OpenAI / Anthropic 原始形状)。授权用方法级 `@PreAuthorize`,当前用户用 `@AuthenticationPrincipal AuthUser` 注入。
 - **模型由渠道派生**:没有 `model` 表;可用模型 = 启用渠道 `models` 列的并集;转发路由走派生的 `ability` 表,不扫描 `channel.models` 字符串。
 - **SPA 回退守卫**:`WebConfig` 对以 `api/`、`v1/`、`anthropic/` 开头的路径返回 `null`(不返回 `index.html`),保住真实路由 / 404,别动。

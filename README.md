@@ -26,7 +26,7 @@ docker compose up -d --build
 
 ## 架构一览
 
-- **两套独立鉴权域**:控制台 `/api/**` 用 JWT、响应统一 `Result` 包裹;转发 `/v1/**`、`/anthropic/**` 用 API Key、响应是对应协议的原始 JSON(不包裹)。
+- **两套独立鉴权域**:控制台 `/api/**` 用 **Spring Security + JWT**、响应统一 `Result` 包裹;转发 `/v1/**`、`/anthropic/**` 用 API Key、响应是对应协议的原始 JSON(不包裹)。
 - **模型由渠道聚合**:不单独维护模型表,可用模型 = 所有**启用渠道** `models` 字段的去重并集;路由经由派生的 `ability` 表(渠道 `group × models` 展开)做索引化选路。
 
 ## 文档
@@ -42,7 +42,7 @@ docker compose up -d --build
 | --- | --- |
 | 后端 | Java 17、Spring Boot 3.4、MyBatis-Plus 3.5 |
 | 数据库 | MySQL 8 |
-| 鉴权 | JWT(jjwt)+ BCrypt |
+| 鉴权 | Spring Security 6 + JWT(jjwt)+ BCrypt |
 | 转发 | JDK `java.net.http.HttpClient`(支持 SSE 流式) |
 | 前端 | Vue 3、Vite、TypeScript、Pinia、Vue Router、axios |
 

@@ -2,7 +2,7 @@
 
 平台分为两个**相互独立**的接口域,鉴权方式与响应格式都不同。
 
-- **控制台接口** `/api/**`:JWT 鉴权,响应统一用 `Result` 包裹。
+- **控制台接口** `/api/**`:Spring Security + JWT 鉴权,响应统一用 `Result` 包裹。
 - **转发接口** `/v1/**`、`/anthropic/**`:平台 API Key 鉴权,透传上游、保持对应协议的原始结构。
 
 默认服务地址 `http://localhost:8321`(见 `application.yml` 的 `server.port`)。
@@ -13,14 +13,14 @@
 
 ### 控制台接口(`/api/**`)
 
-- **鉴权**:先登录拿 JWT,后续请求带 `Authorization: Bearer <jwt>`;仅 `/api/auth/login`、`/api/auth/register` 公开。
+- **鉴权**:先登录拿 JWT,后续请求带 `Authorization: Bearer <jwt>`;仅 `/api/auth/login`、`/api/auth/register` 公开。登录由 Spring Security 的 `AuthenticationManager` 认证,管理员接口用方法级 `@PreAuthorize("hasRole('ADMIN')")` 鉴权。
 - **响应**:统一结构
 
   ```json
   { "code": 200, "message": "success", "data": {}, "timestamp": 1730000000000 }
   ```
 
-- **错误**:业务失败也可能是 **HTTP 200 但 `code != 200`**(例如 `403` 无权限),需按 `code` 判断;`401` 表示未登录 / JWT 失效。
+- **错误**:业务失败可能是 **HTTP 200 但 `code != 200`**(参数校验、资源不存在、**非角色类**的无权限如「只能操作自己的资源」等),需按 `code` 判断;基于角色的无权限(`@PreAuthorize`)是**真实 HTTP 403**;`401` 表示未登录 / JWT 失效。两类错误体都是 `Result` 结构,`message` 可直接展示。
 
 ### 转发接口(`/v1/**`、`/anthropic/**`)
 

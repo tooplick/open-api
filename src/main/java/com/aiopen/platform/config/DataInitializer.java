@@ -2,7 +2,7 @@ package com.aiopen.platform.config;
 
 import com.aiopen.platform.modules.user.entity.User;
 import com.aiopen.platform.modules.user.service.UserService;
-import com.aiopen.platform.security.UserContext;
+import com.aiopen.platform.security.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -29,7 +29,7 @@ public class DataInitializer implements CommandLineRunner {
         admin.setUsername("admin");
         admin.setPassword(passwordEncoder.encode("admin"));
         admin.setEmail("admin@example.com");
-        admin.setRole(UserContext.ROLE_ADMIN);
+        admin.setRole(Roles.ADMIN);
         admin.setStatus(1);
         userService.save(admin);
         log.info("已创建默认管理员账号: admin / admin (请尽快修改密码)");

@@ -40,10 +40,10 @@ mvn test -Dtest=ClassName#methodName
 ### Two independent auth domains (most important thing to understand)
 Requests split into two worlds with **separate authentication and separate response conventions**:
 
-1. **Console API `/api/**`** — JWT auth. `AuthInterceptor` (registered in `WebConfig`, excludes `/api/auth/login|register`) parses the `Authorization: Bearer <jwt>` header and populates `UserContext` (a ThreadLocal). Responses are wrapped in `common.result.Result<T>`. Exceptions handled by `GlobalExceptionHandler` (`@RestControllerAdvice`).
-2. **Relay API `/v1/**`** — API Key auth. `RelayAuthService` validates `Bearer sk-...` against the `api_key` table per request (existence, status, expiry — **no quota check**). Responses are **raw OpenAI-compatible JSON / passthrough**, NOT `Result`-wrapped. Errors are returned in OpenAI shape (`{"error":{...}}`) by **controller-local `@ExceptionHandler`s inside `RelayController`**, which deliberately take precedence over the global handler. `/v1/**` is excluded from `AuthInterceptor`.
+1. **Console API `/api/**`** — JWT auth via **Spring Security** (stateless filter chain in `config/SecurityConfig`). `JwtAuthenticationFilter` parses the `Authorization: Bearer <jwt>` header, loads the user through `CustomUserDetailsService`, and stores an `AuthUser` principal in the `SecurityContext`. `/api/auth/login|register` are `permitAll`; the rest of `/api/**` requires authentication. Responses are wrapped in `common.result.Result<T>`. Business exceptions are handled by `GlobalExceptionHandler` (`@RestControllerAdvice`); auth failures (401) and role denials (403) are written as `Result`-shaped JSON by `SecurityConfig`'s `AuthenticationEntryPoint` / `AccessDeniedHandler`.
+2. **Relay API `/v1/**`** — API Key auth. `RelayAuthService` validates `Bearer sk-...` against the `api_key` table per request (existence, status, expiry — **no quota check**). Responses are **raw OpenAI-compatible JSON / passthrough**, NOT `Result`-wrapped. Errors are returned in OpenAI shape (`{"error":{...}}`) by **controller-local `@ExceptionHandler`s inside `RelayController`**, which deliberately take precedence over the global handler. `/v1/**` and `/anthropic/**` are `permitAll` in the security chain (and skipped by `JwtAuthenticationFilter.shouldNotFilter`), so they bypass JWT entirely and rely on their own API-Key auth.
 
-There is **no Spring Security framework** — only `spring-security-crypto` for BCrypt. Role checks are imperative: `UserContext.requireAdmin()` called inside controller methods.
+Auth is built on **Spring Security 6** (`spring-boot-starter-security`). **Authentication**: login (`AuthService`) calls `AuthenticationManager.authenticate(...)` → `DaoAuthenticationProvider` + `CustomUserDetailsService` + BCrypt `PasswordEncoder`, then issues a JWT; per-request auth is the stateless `JwtAuthenticationFilter`. **Authorization**: method-level `@PreAuthorize("hasRole('ADMIN')")` on controllers (`@EnableMethodSecurity`); the current user is injected with `@AuthenticationPrincipal AuthUser`. The DB `role` column stores lowercase `admin`/`user` (`security/Roles`), mapped to authorities `ROLE_ADMIN`/`ROLE_USER`. Resource-ownership checks that aren't role-based (a user touching only their own API keys) stay imperative as `BusinessException(FORBIDDEN)`. **Login lives in its own `AuthService`, not `UserService`** — calling `AuthenticationManager` from `UserServiceImpl` would form a cycle (`UserServiceImpl → AuthenticationManager → UserDetailsService → UserService`), which Spring Boot rejects by default.
 
 ### No `model` table — models are derived from channels
 Models are **not** maintained by hand. Each channel's `models` column (comma-separated) declares what it serves. The set of usable models is the de-duplicated union over **enabled** channels:
@@ -76,7 +76,7 @@ Both `api_key` and `channel` carry a `group`. A relay request routes with the **
 - Sensitive write-only fields (`user.password`, `channel.apiKey`) are `@JsonIgnore` so they're never returned.
 
 ### Module layout
-`com.aiopen.platform.modules.<feature>` with `{entity, mapper, dto, service, service.impl, controller}`. The `ability` module is the derived routing layer maintained by `channel` writes; `relay/adaptor` holds the provider adapters. Cross-cutting code lives in `common/` (Result, exceptions, BaseEntity), `config/` (MyBatis-Plus, JWT props, CORS+interceptors, crypto, data init), and `security/` (JwtUtil, UserContext, AuthInterceptor).
+`com.aiopen.platform.modules.<feature>` with `{entity, mapper, dto, service, service.impl, controller}`. The `ability` module is the derived routing layer maintained by `channel` writes; `relay/adaptor` holds the provider adapters. Cross-cutting code lives in `common/` (Result, exceptions, BaseEntity), `config/` (MyBatis-Plus, JWT props, Spring Security `SecurityConfig`, crypto, data init; the SPA resource handler is in `WebConfig`), and `security/` (`JwtUtil`, `JwtAuthenticationFilter`, `CustomUserDetailsService`, `AuthUser`, `Roles`).
 
 ## Frontend (`frontend/`)
 
@@ -94,10 +94,11 @@ No frontend test runner exists. The build fails on type errors **and** on unused
 
 ### The axios layer mirrors the backend's two response conventions (most important)
 `src/api/http.ts` is the linchpin. Its `get/post/put/del` helpers **unwrap the `Result<T>` envelope** and return `.data.data`, so `api/*.ts` modules and views receive plain typed data. Error handling tracks the backend's split (see "Two independent auth domains"):
-- **HTTP 401** (missing/invalid JWT, emitted by `AuthInterceptor`) → `forceLogout()` clears the store and redirects to `/login`.
-- **HTTP 200 with `body.code !== 200`** (business exceptions incl. `403` forbidden, from `GlobalExceptionHandler`) → rejected as an `ApiError` plus an error toast.
+- **HTTP 401** (missing/invalid JWT, emitted by `SecurityConfig`'s `AuthenticationEntryPoint`) → `forceLogout()` clears the store and redirects to `/login`.
+- **HTTP 200 with `body.code !== 200`** (business exceptions from `GlobalExceptionHandler` — validation, not-found, or an ownership-`403` raised as a `BusinessException`) → rejected as an `ApiError` plus an error toast.
+- **Real HTTP 403** (role denial from `@PreAuthorize`, written as `Result` JSON by the `AccessDeniedHandler`) → axios error branch shows a toast; status ≠ 401 so **no** logout.
 
-So a forbidden error is **not** an HTTP error — it is a 200 the interceptor must inspect by `code`.
+So a 401 always logs out; a 403 — whether it arrives as a real HTTP 403 (role denial) or as a 200 + `code:403` (ownership denial) — just shows an error toast. Both carry a `Result` body, so `body.message` drives the toast.
 
 ### Global singletons, not provide/inject
 `composables/useToast.ts` (`toast.success/error/info`) and `composables/useConfirm.ts` (`confirmDialog()` returning `Promise<boolean>`) are module-level reactive singletons callable from anywhere — including the axios interceptor. Their hosts (`ToastHost.vue`, `ConfirmHost.vue`) are mounted once in `App.vue`.

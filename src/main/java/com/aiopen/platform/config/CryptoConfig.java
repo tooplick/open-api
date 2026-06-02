@@ -6,7 +6,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * 仅提供密码编码器(使用 spring-security-crypto,不引入完整 Spring Security)。
+ * 提供密码编码器:登录认证(AuthenticationManager/DaoAuthenticationProvider)与注册改密均使用它。
  */
 @Configuration
 public class CryptoConfig {

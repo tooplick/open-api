@@ -5,11 +5,12 @@ import com.aiopen.platform.common.result.Result;
 import com.aiopen.platform.modules.log.dto.LogStatVO;
 import com.aiopen.platform.modules.log.entity.Log;
 import com.aiopen.platform.modules.log.service.LogService;
-import com.aiopen.platform.security.UserContext;
+import com.aiopen.platform.security.AuthUser;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,7 +30,8 @@ public class LogController {
     private final LogService logService;
 
     @GetMapping("/page")
-    public Result<PageResult<Log>> page(@RequestParam(defaultValue = "1") long current,
+    public Result<PageResult<Log>> page(@AuthenticationPrincipal AuthUser principal,
+                                        @RequestParam(defaultValue = "1") long current,
                                         @RequestParam(defaultValue = "10") long size,
                                         @RequestParam(required = false) Long userId,
                                         @RequestParam(required = false) Long channelId,
@@ -37,7 +39,7 @@ public class LogController {
                                         @RequestParam(required = false) Integer type,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        Long effectiveUserId = UserContext.isAdmin() ? userId : UserContext.getUserId();
+        Long effectiveUserId = principal.isAdmin() ? userId : principal.getId();
         Page<Log> page = logService.page(new Page<>(current, size),
                 Wrappers.<Log>lambdaQuery()
                         .eq(effectiveUserId != null, Log::getUserId, effectiveUserId)
@@ -51,10 +53,11 @@ public class LogController {
     }
 
     @GetMapping("/statistics")
-    public Result<LogStatVO> statistics(@RequestParam(required = false) Long userId,
+    public Result<LogStatVO> statistics(@AuthenticationPrincipal AuthUser principal,
+                                        @RequestParam(required = false) Long userId,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        Long effectiveUserId = UserContext.isAdmin() ? userId : UserContext.getUserId();
+        Long effectiveUserId = principal.isAdmin() ? userId : principal.getId();
         return Result.success(logService.statistics(effectiveUserId, startTime, endTime));
     }
 }

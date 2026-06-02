@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 /**
  * Anthropic 兼容入站入口(/anthropic/**)。客户端把 base_url 设为 .../anthropic,Claude/Anthropic SDK 会
  * 自动拼出 /anthropic/v1/messages。用 x-api-key 鉴权,错误以 Anthropic 格式返回(本地 @ExceptionHandler,
- * 不走全局 Result 包装)。注意:AuthInterceptor 仅拦截 /api/**,故本前缀天然走 API Key 鉴权。
+ * 不走全局 Result 包装)。注意:Spring Security 对本前缀放行(permitAll),JWT 过滤器也跳过,故天然走 API Key 鉴权。
  */
 @Slf4j
 @RestController
