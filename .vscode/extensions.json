@@ -1,0 +1,12 @@
+{
+  // 打开本工作区时,VS Code 会提示安装以下推荐插件
+  "recommendations": [
+    // 后端:Java / Spring Boot
+    "vscjava.vscode-java-pack",
+    "vmware.vscode-boot-dev-pack",
+    // 前端:Vue 3 + TypeScript(Volar)
+    "Vue.volar",
+    // 容器
+    "ms-azuretools.vscode-docker"
+  ]
+}

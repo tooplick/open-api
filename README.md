@@ -64,7 +64,7 @@ mvn -DskipTests clean package
 java -jar target/ai-open-platform-0.0.1-SNAPSHOT.jar
 ```
 
-服务默认监听 `http://localhost:8080`。
+服务默认监听 `http://localhost:8321`。
 
 ### 4. 默认管理员
 
@@ -79,12 +79,58 @@ java -jar target/ai-open-platform-0.0.1-SNAPSHOT.jar
 
 ---
 
+## Docker 部署(前后端合并单镜像,推荐)
+
+无需本地安装 JDK / Node / MySQL,只要有 Docker。前后端被打进**同一个镜像**,数据库为独立容器。
+
+```bash
+docker compose up -d --build
+```
+
+会拉起两个服务:
+
+- `app`:Spring Boot 单镜像,同时托管前端页面与 `/api`、`/v1`、`/anthropic`,监听 **8321**
+- `mysql`:MySQL 8,首次启动用 `schema.sql` 自动建表
+
+访问 `http://localhost:8321` 打开控制台,默认管理员 `admin / admin`。
+
+常用操作:
+
+```bash
+docker compose logs -f app    # 跟踪后端日志
+docker compose down           # 停止(保留数据卷)
+docker compose down -v        # 停止并清空数据库卷(下次 up 会用 schema.sql 重新建表)
+```
+
+### 可选配置(`.env`)
+
+复制 `.env.example` 为 `.env` 后按需修改,compose 会自动读取(不创建也能直接 `up`,各项使用默认值):
+
+```bash
+cp .env.example .env
+```
+
+| 变量 | 说明 | 默认值 |
+| --- | --- | --- |
+| `AIOPEN_JWT_SECRET` | JWT 签名密钥,**生产必须改**(>=32 字节随机串) | `change-me-…-2026` |
+| `MYSQL_PASSWORD` | MySQL root 密码(mysql 容器与后端数据源共用) | `root` |
+| `APP_PORT` | 对外暴露端口(容器内固定 8321) | `8321` |
+
+说明:
+
+- 数据源通过环境变量注入(`SPRING_DATASOURCE_*`),不必改 `application.yml`;compose 里数据库主机名就是服务名 `mysql`。
+- `schema.sql` 是 `DROP`+`CREATE`,仅在数据卷为空时执行一次;需要重置数据库就 `down -v` 清卷后再 `up`。
+
+更完整的安装/运行方式(含手动部署)见 [install.md](install.md)。
+
+---
+
 ## 使用流程(curl 示例)
 
 ### ① 登录拿 token
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:8321/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}'
 # 返回 data.token,后续控制台接口在 Header 携带: Authorization: Bearer <token>
@@ -93,7 +139,7 @@ curl -X POST http://localhost:8080/api/auth/login \
 ### ② 管理员创建渠道(接入上游服务商)
 
 ```bash
-curl -X POST http://localhost:8080/api/channels \
+curl -X POST http://localhost:8321/api/channels \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -113,7 +159,7 @@ curl -X POST http://localhost:8080/api/channels \
 ### ③ 创建调用用的 API Key
 
 ```bash
-curl -X POST http://localhost:8080/api/keys \
+curl -X POST http://localhost:8321/api/keys \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"name":"我的key"}'
@@ -124,19 +170,19 @@ curl -X POST http://localhost:8080/api/keys \
 
 ```bash
 # 非流式
-curl -X POST http://localhost:8080/v1/chat/completions \
+curl -X POST http://localhost:8321/v1/chat/completions \
   -H "Authorization: Bearer <上一步的 sk- key>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"你好"}]}'
 
 # 流式
-curl -N -X POST http://localhost:8080/v1/chat/completions \
+curl -N -X POST http://localhost:8321/v1/chat/completions \
   -H "Authorization: Bearer <sk- key>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","stream":true,"messages":[{"role":"user","content":"你好"}]}'
 ```
 
-也可直接配合 OpenAI SDK:把 `base_url` 指向 `http://localhost:8080/v1`,`api_key` 用平台的 sk- key。
+也可直接配合 OpenAI SDK:把 `base_url` 指向 `http://localhost:8321/v1`,`api_key` 用平台的 sk- key。
 
 ---
 
@@ -234,7 +280,7 @@ npm install
 npm run dev        # 开发服务器 http://localhost:5173
 ```
 
-开发态已配置反向代理:`/api` 与 `/v1` 自动转发到后端 `http://localhost:8080`(见 `vite.config.ts`),前端统一用相对路径请求,无需关心跨域。请先启动后端。
+开发态已配置反向代理:`/api` 与 `/v1` 自动转发到后端 `http://localhost:8321`(见 `vite.config.ts`),前端统一用相对路径请求,无需关心跨域。请先启动后端。
 
 ### 构建
 

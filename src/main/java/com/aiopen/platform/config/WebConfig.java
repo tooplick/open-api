@@ -66,8 +66,11 @@ public class WebConfig implements WebMvcConfigurer {
                                 || resourcePath.startsWith("anthropic/")) {
                             return null;
                         }
-                        // 其余未命中路径回退到前端入口
-                        return new ClassPathResource("/static/index.html");
+                        // 其余未命中路径回退到前端入口;若前端未打包进 static(例如本地只跑
+                        // 后端、前端交给 Vite),index.html 不存在则返回 null 走正常 404,
+                        // 避免 ResourceHttpRequestHandler 解析不存在的资源抛 FileNotFoundException
+                        Resource index = new ClassPathResource("/static/index.html");
+                        return index.exists() ? index : null;
                     }
                 });
     }

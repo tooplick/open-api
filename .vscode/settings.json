@@ -1,0 +1,17 @@
+{
+  // 搜索与资源管理器中隐藏构建产物
+  "files.exclude": {
+    "**/target": true,
+    "**/node_modules": true,
+    "**/frontend/dist": true
+  },
+  "search.exclude": {
+    "**/target": true,
+    "**/node_modules": true,
+    "**/frontend/dist": true
+  },
+  // Java:扩展自动跟随 pom.xml 变更刷新构建配置
+  "java.configuration.updateBuildConfiguration": "automatic",
+  // 本机为 JDK 24、语言级别 17,由扩展按 pom 解析,无需在此固定 JDK 路径
+  "files.encoding": "utf8"
+}

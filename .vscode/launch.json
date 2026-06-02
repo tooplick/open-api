@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // 调试启动后端(需本地可达的 MySQL;也可只用 Docker 起一个 MySQL 给本地后端连)
+      "type": "java",
+      "name": "Spring Boot: AiOpenPlatformApplication",
+      "request": "launch",
+      "mainClass": "com.aiopen.platform.AiOpenPlatformApplication",
+      "projectName": "ai-open-platform",
+      "env": {
+        // 默认连 localhost:3306、root/root(见 application.yml)。需要覆盖时取消注释:
+        // "SPRING_DATASOURCE_URL": "jdbc:mysql://localhost:3306/ai_open_platform?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai",
+        // "SPRING_DATASOURCE_USERNAME": "root",
+        // "SPRING_DATASOURCE_PASSWORD": "root",
+        // "AIOPEN_JWT_SECRET": "本地随机密钥,至少32字节"
+      }
+    }
+  ]
+}

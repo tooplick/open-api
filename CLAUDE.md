@@ -86,7 +86,7 @@ Vue 3 + Vite + TypeScript SPA — **Pinia** (state), **Vue Router**, **axios** (
 ```bash
 cd frontend
 npm install
-npm run dev        # dev server :5173; proxies /api and /v1 -> localhost:8080 (vite.config.ts)
+npm run dev        # dev server :5173; proxies /api and /v1 -> localhost:8321 (vite.config.ts)
 npm run build      # runs `vue-tsc --noEmit` THEN `vite build` — typecheck is part of the build
 npm run typecheck  # vue-tsc --noEmit only
 ```
@@ -112,7 +112,7 @@ See `README.md` for an endpoint table and a curl walkthrough (note: parts of it 
 
 ## Docker / deployment (single image)
 
-Deployment is **front-back combined** (matching the `new-api` blueprint): one image runs the whole platform, MySQL is the only separate container. `docker compose up -d --build` starts two services — `app` and `mysql` — and the Vue UI plus `/api`, `/v1`, `/anthropic` are all served on **port 8080** (same origin, so no CORS in prod). Local dev is unchanged: `npm run dev` + the Vite proxy still runs the two halves separately; only the container build bundles them.
+Deployment is **front-back combined** (matching the `new-api` blueprint): one image runs the whole platform, MySQL is the only separate container. `docker compose up -d --build` starts two services — `app` and `mysql` — and the Vue UI plus `/api`, `/v1`, `/anthropic` are all served on **port 8321** (same origin, so no CORS in prod). Local dev is unchanged: `npm run dev` + the Vite proxy still runs the two halves separately; only the container build bundles them.
 
 - **Three-stage `Dockerfile`**: (1) `node` builds the Vue app; (2) `maven` copies that `dist/` into `src/main/resources/static/` *before* `mvn package`, baking the SPA into the fat jar; (3) `eclipse-temurin:17-jre` runs it. Building with JDK 17 in the image sidesteps the JDK 24 Lombok problem entirely. The root `.dockerignore` lets `frontend/` source into the build context but excludes `frontend/node_modules` and `frontend/dist`.
 - **Spring Boot serves the SPA** via `WebConfig.addResourceHandlers`: `/**` → `classpath:/static/` with a `PathResourceResolver` that falls back to `index.html` for unmatched paths **except** those starting `api/`, `v1/`, `anthropic/` (those return `null`, preserving real routing/404 instead of being handed HTML). This is what lets Vue's `createWebHistory` deep links survive a hard refresh — don't drop the guard, or unknown API paths start returning the SPA page.
