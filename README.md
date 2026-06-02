@@ -48,4 +48,4 @@ docker compose up -d --build
 
 ## 许可证
 
-本项目以 [MIT License](LICENSE) 发布。
+本项目以 [MIT License](LICENSE) 发布
