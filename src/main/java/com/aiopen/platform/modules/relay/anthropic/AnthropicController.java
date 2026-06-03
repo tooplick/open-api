@@ -41,6 +41,13 @@ public class AnthropicController {
     private final AbilityService abilityService;
     private final AnthropicConverter converter;
 
+    @GetMapping
+    public Map<String, Object> health() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("status", "ok");
+        return m;
+    }
+
     @PostMapping("/v1/messages")
     public void messages(HttpServletRequest request, HttpServletResponse response) throws IOException {
         anthropicRelayService.relayMessages(request, response);
