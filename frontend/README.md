@@ -92,4 +92,4 @@ npx shadcn-vue@latest add <组件名>   # 例如 dropdown-menu、tooltip
 
 - `stores/auth.ts` 把 token+user 存 localStorage,key 定义在 `utils/constants.ts`。
 - 路由守卫做登录校验与 `meta.admin` 鉴权;`AppLayout.vue` 会隐藏管理员菜单。**前端的角色判断只是体验优化,后端每个管理操作都会再校验一次。**
-```
+
