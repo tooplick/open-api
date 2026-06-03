@@ -18,7 +18,7 @@
 
 ## 快速开始(Docker)
 
-直接拉取预构建镜像(推荐,无需本地构建):
+直接拉取镜像(推荐,无需本地构建):
 
 ```bash
 docker pull tooplick/open-api:latest
@@ -31,9 +31,10 @@ git clone https://github.com/tooplick/open-api.git && cd open-api
 docker compose up -d --build
 ```
 
-打开 `http://localhost:8321`,默认管理员 `admin / admin`(请尽快改密码)。可选配置见 `.env.example`;手动部署见 [install.md](install.md)。
+打开 `http://localhost:8321`,默认管理员 `admin / admin`(请尽快改密码)。可选配置见 `.env.example`;  
 
-> 每次推送到 `main` 分支时,GitHub Actions 会自动构建并发布 Docker 镜像到 Docker Hub。详见 [install.md](/docs/install.md#方式一直接拉取预构建镜像推荐)。
+> 每次推送到 `main` 分支时,GitHub Actions 会自动构建并发布 Docker 镜像到 Docker Hub。  
+> 详见 [install.md](/docs/install.md#方式一直接拉取预构建镜像推荐)。
 
 ## 架构一览
 
