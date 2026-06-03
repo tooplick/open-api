@@ -6,7 +6,7 @@
 
 ## 开发环境
 
-完整安装步骤见 [install.md](install.md)。最小开发环境:
+完整安装步骤见 [install.md](./docs/install.md)。最小开发环境:
 
 - JDK 17+(已在 JDK 24 验证,注意下方 Lombok 约束)、Maven 3.9+、MySQL 8
 - Node.js 18+(仅前端需要)
@@ -30,7 +30,7 @@ npm run dev                       # :5173,代理 /api /v1 /anthropic -> localhos
 1. 从 `main` 切出特性分支:`git checkout -b feat/xxx`(`feat/` `fix/` `docs/` `refactor/` 等前缀)。
 2. 小步提交,提交信息见下方[提交规范](#提交规范)。
 3. **提交前自检**(见下方[提交前检查](#提交前检查))必须全绿。
-4. 推送并发起 PR,描述清楚**改了什么、为什么**;涉及接口或行为变化时同步更新相关文档([api.md](api.md) / [README.md](README.md) / [install.md](install.md))。
+4. 推送并发起 PR,描述清楚**改了什么、为什么**;涉及接口或行为变化时同步更新相关文档([api.md](./docs/api.md) / [README.md](README.md) / [install.md](./docs/install.md))。
 
 ---
 
