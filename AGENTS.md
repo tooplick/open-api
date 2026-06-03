@@ -11,10 +11,10 @@ AI Open Platform — 把多家 LLM 提供商聚合在单一 **OpenAI 兼容** AP
 | 文件 | 内容 |
 | --- | --- |
 | [CLAUDE.md](./CLAUDE.md) | **权威指南**:架构全景、构建陷阱、各模块约定。动代码前必读。 |
-| [api.md](./api.md) | 接口文档:控制台 `/api/**` 与转发 `/v1`、`/anthropic` 的鉴权、响应、端点清单。 |
-| [TODO.md](./TODO.md) | 待办路线图。 |
+| [api.md](./docs/api.md) | 接口文档:控制台 `/api/**` 与转发 `/v1`、`/anthropic` 的鉴权、响应、端点清单。 |
+| [TODO.md](./docs/TODO.md) | 待办路线图。 |
 | [README.md](./README.md) | 端点表与 curl 演练(部分内容早于重构,可能已过时)。 |
-| [install.md](./install.md) | Docker 与手动(JDK / Maven / MySQL / Node)两种部署路径。 |
+| [install.md](./docs/install.md) | Docker 与手动(JDK / Maven / MySQL / Node)两种部署路径。 |
 
 ## 快速命令
 

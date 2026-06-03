@@ -7,8 +7,8 @@
 
 ## 特性
 
-- **OpenAI 兼容**:`/v1/chat/completions`、`/v1/models`,可直接配合 OpenAI SDK;并提供 **Anthropic 兼容入站**(`/anthropic/v1/messages`)。
-- **多渠道聚合与智能选路**:同一模型可挂多个渠道,先按 `priority` 取最高,再在同优先级内按 `weight` 加权随机;渠道类型支持 OpenAI、Anthropic(适配器可扩展)。
+- **OpenAI 兼容**:`/v1/chat/completions`、`/v1/models`,可直接配合 OpenAI SDK,并提供 **Anthropic 兼容入站**(`/anthropic/v1/messages`)。
+- **多渠道聚合与智能选路**:同一模型可挂多个渠道,先按 `priority` 取最高,再在同优先级内按 `weight` 加权随机,渠道类型支持 OpenAI、Anthropic(适配器可扩展)。
 - **分组隔离**:API Key 与渠道以 `group` 关联——key 只能路由到同组渠道,并可设模型白名单。
 - **API Key 管理**:`sk-` 开头密钥,支持启停、过期、模型限制。
 - **调用日志与统计**:记录每次转发的 token 用量(**不计费、不限额**)。
@@ -33,8 +33,9 @@ docker compose up -d --build
 
 | 文档 | 内容 |
 | --- | --- |
-| [install.md](install.md) | 安装与运行(Docker / 手动部署) |
-| [api.md](api.md) | 接口列表、鉴权与响应约定、curl 与 SDK 用法 |
+| [install.md](/docs/install.md) | 安装与运行(Docker / 手动部署) |
+| [api.md](/docs/api.md) | 接口列表、鉴权与响应约定、curl 与 SDK 用法 |
+| [TODO.md](/docs/TODO.md) | 待办事项与功能规划 |
 
 ## 技术栈
 
