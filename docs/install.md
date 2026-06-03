@@ -1,18 +1,72 @@
 # 安装与运行
 
-AI Open Platform 提供两种安装方式:**Docker 单镜像(推荐)** 与 **手动部署**。
+AI Open Platform 提供三种安装方式:**直接拉取预构建镜像(推荐)**、**从源码构建** 与 **手动部署**。
 
 ---
 
-## 方式一:Docker(推荐)
+## 方式一:直接拉取预构建镜像(推荐)
 
-clone 到本地  
+本项目通过 GitHub Actions 在每次推送到 `main` 分支时自动构建并发布 Docker 镜像到 Docker Hub,无需本地构建。
+
+### 1. 拉取镜像
+
+```bash
+docker pull tooplick/open-api:latest
+```
+
+也可指定特定版本(基于 commit SHA):
+
+```bash
+docker pull tooplick/open-api:sha-<commit>
+```
+
+### 2. 使用 docker compose 启动
+
+clone 仓库(需要 `docker-compose.yml` 和 `schema.sql`):
 
 ```bash
 git clone https://github.com/tooplick/open-api.git && cd open-api
 ```
 
-起docker容器  
+编辑 `docker-compose.yml` 中 `app` 服务的 `image` 字段,移除 `build` 配置,改为使用预构建镜像:
+
+```yaml
+  app:
+    image: tooplick/open-api:latest
+    # 移除 build: 配置块
+```
+
+然后启动:
+
+```bash
+docker compose up -d
+```
+
+- 控制台 / API / 转发统一入口:`http://localhost:8321`
+- 默认管理员:`admin / admin`(首次启动自动创建,请尽快改密码)
+- 数据库:容器内 MySQL 8,首次用 `src/main/resources/db/schema.sql` 自动建表
+
+### CI/CD 说明
+
+本项目的 GitHub Actions 工作流(`.github/workflows/docker-publish.yml`)会在每次推送到 `main` 分支时:
+
+1. 使用 Docker Buildx 构建多阶段镜像(前端 Node 构建 + 后端 Maven 构建 + JRE 运行时)
+2. 推送到 Docker Hub,标签为 `latest` 和 `sha-<commit>`
+3. 使用 GitHub Actions 缓存加速后续构建
+
+如需手动触发构建,只需向 `main` 分支推送任意 commit。
+
+---
+
+## 方式二:从源码构建(推荐开发使用)
+
+clone 到本地
+
+```bash
+git clone https://github.com/tooplick/open-api.git && cd open-api
+```
+
+起docker容器
 
 ```bash
 docker compose up -d --build
@@ -42,7 +96,7 @@ cp .env.example .env
 
 ---
 
-## 方式二:手动部署
+## 方式三:手动部署
 
 ### 前置环境
 
