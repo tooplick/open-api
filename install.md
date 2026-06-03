@@ -7,6 +7,10 @@ AI Open Platform 提供两种安装方式:**Docker 单镜像(推荐)** 与 **手
 ## 方式一:Docker(推荐)
 
 ```bash
+git clone https://github.com/tooplick/open-api.git
+```
+
+```bash
 docker compose up -d --build
 ```
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { computed, provide, ref, watch } from 'vue'
-import { useEventListener, useMediaQuery } from '@vueuse/core'
+import { useEventListener, useMediaQuery, useStorage } from '@vueuse/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import {
@@ -18,7 +18,7 @@ const props = withDefaults(
     open?: boolean
     class?: HTMLAttributes['class']
   }>(),
-  { defaultOpen: true },
+  { defaultOpen: true, open: undefined },
 )
 
 const emits = defineEmits<{ 'update:open': [value: boolean] }>()
@@ -26,17 +26,12 @@ const emits = defineEmits<{ 'update:open': [value: boolean] }>()
 const isMobile = useMediaQuery('(max-width: 767px)')
 const openMobile = ref(false)
 
-function readStored(): boolean {
-  const v = localStorage.getItem(SIDEBAR_STORAGE_KEY)
-  return v === null ? props.defaultOpen : v === 'true'
-}
-
-const open = ref(typeof props.open === 'boolean' ? props.open : readStored())
+const open = useStorage<boolean>(SIDEBAR_STORAGE_KEY, props.defaultOpen)
+if (typeof props.open === 'boolean') open.value = props.open
 
 function setOpen(value: boolean): void {
   open.value = value
   emits('update:open', value)
-  localStorage.setItem(SIDEBAR_STORAGE_KEY, String(value))
 }
 
 watch(
