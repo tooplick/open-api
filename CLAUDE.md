@@ -80,7 +80,7 @@ Both `api_key` and `channel` carry a `group`. A relay request routes with the **
 
 ## Frontend (`frontend/`)
 
-Vue 3 + Vite + TypeScript SPA — **Pinia** (state), **Vue Router**, **axios** (HTTP). Components are **hand-written by design; do NOT add a UI component library** (Element Plus / Ant Design Vue, etc.). This is a standing project decision — Pinia/axios/Vue Router are fine, but UI widgets (tables, modals, pagination, toasts) are built by hand in `src/components/`.
+Vue 3 + Vite + TypeScript SPA — **Pinia** (state), **Vue Router**, **axios** (HTTP). The UI is built on **shadcn-vue** (Reka UI primitives + **Tailwind v4**); components are generated into `src/components/ui/` and **owned/edited in-repo** (add more with `npx shadcn-vue@latest add <name>` — `components.json` is configured). Icons are **`@lucide/vue`**, forms use **vee-validate + zod**, toasts use **vue-sonner**. The `cn()` helper is in `src/lib/utils.ts`; the theme — the original "Lumina Nexus" steel-grey **light** palette ported onto shadcn CSS variables (`:root` + `@theme inline`) — lives in `src/styles/main.css`. *History: the console was originally hand-written with no UI library; it was migrated to shadcn-vue (spec: `docs/superpowers/specs/2026-06-03-frontend-shadcn-vue-rewrite-design.md`). Adding a different UI component library on top is still discouraged — extend by adding/owning shadcn components.*
 
 ### Frontend commands
 ```bash
@@ -100,14 +100,14 @@ No frontend test runner exists. The build fails on type errors **and** on unused
 
 So a 401 always logs out; a 403 — whether it arrives as a real HTTP 403 (role denial) or as a 200 + `code:403` (ownership denial) — just shows an error toast. Both carry a `Result` body, so `body.message` drives the toast.
 
-### Global singletons, not provide/inject
-`composables/useToast.ts` (`toast.success/error/info`) and `composables/useConfirm.ts` (`confirmDialog()` returning `Promise<boolean>`) are module-level reactive singletons callable from anywhere — including the axios interceptor. Their hosts (`ToastHost.vue`, `ConfirmHost.vue`) are mounted once in `App.vue`.
+### Toasts and confirms
+Toasts use **vue-sonner**: `import { toast } from 'vue-sonner'` and call `toast.success/error/info` from anywhere — **including the axios interceptor** (sonner's `toast` is a global imperative function, so non-component contexts work). The `<Toaster/>` (shadcn `sonner` wrapper) is mounted once in `App.vue`. Confirmations use shadcn **`AlertDialog`** declaratively, per-view: each deleting view holds its own `showDelete` boolean + a `deleteTarget` ref and renders an `<AlertDialog v-model:open>`. There is **no** global toast/confirm singleton anymore (the old `useToast`/`useConfirm` composables + `ToastHost`/`ConfirmHost` were removed in the shadcn-vue migration).
 
 ### Auth, routing, and an intentional import cycle
 `stores/auth.ts` persists `token`+`user` to localStorage; the storage keys live in `utils/constants.ts`. That constants file exists specifically to break a module init-order hazard: `http.ts ↔ stores/auth.ts ↔ router/index.ts` form an import cycle that is safe **only because the cross-references run at call time, not at module load** — keep it that way. The router guard enforces login and `meta.admin`-gated routes; `AppLayout.vue` hides admin nav items. **Frontend role checks are convenience only — the backend re-checks every admin action.**
 
 ### Models page is read-only; channels/keys carry a group
-`ModelsView` is **read-only** (there is no create/update/delete) — it lists the aggregated available models from `/api/models` (a `string[]`). The channel form includes `group` and a `type` dropdown (openai/anthropic/...); the API Key form includes `group` and an optional `models` whitelist. Because `channel.apiKey` is `@JsonIgnore` (never serialized back), the channel edit form opens with a blank key field and the admin must re-enter the upstream key on every save (`ChannelRequest.apiKey` is `@NotBlank`); the field accepts newline-separated multiple keys.
+`ModelsView` is **read-only** (there is no create/update/delete) — it lists the aggregated available models from `/api/models` (a `string[]`). The channel form includes `group` (channel `type` is not exposed in the form — it defaults to `openai` on create and is preserved on edit); the API Key form includes `group` and an optional `models` whitelist. Because `channel.apiKey` is `@JsonIgnore` (never serialized back), the channel edit form opens with a blank key field and the admin must re-enter the upstream key on every save (`ChannelRequest.apiKey` is `@NotBlank`); the field accepts newline-separated multiple keys.
 
 See `README.md` for an endpoint table and a curl walkthrough (note: parts of it predate the no-billing / channel-derived-models refactor and may be stale).
 

@@ -2,6 +2,7 @@ package com.aiopen.platform.modules.log.controller;
 
 import com.aiopen.platform.common.result.PageResult;
 import com.aiopen.platform.common.result.Result;
+import com.aiopen.platform.modules.log.dto.LogDailyStatVO;
 import com.aiopen.platform.modules.log.dto.LogStatVO;
 import com.aiopen.platform.modules.log.entity.Log;
 import com.aiopen.platform.modules.log.service.LogService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 调用日志查询。普通用户仅能查看自己的日志,管理员可查看全部并按 userId 过滤。
@@ -59,5 +61,14 @@ public class LogController {
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
         Long effectiveUserId = principal.isAdmin() ? userId : principal.getId();
         return Result.success(logService.statistics(effectiveUserId, startTime, endTime));
+    }
+
+    @GetMapping("/daily")
+    public Result<List<LogDailyStatVO>> daily(@AuthenticationPrincipal AuthUser principal,
+                                              @RequestParam(required = false) Long userId,
+                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+        Long effectiveUserId = principal.isAdmin() ? userId : principal.getId();
+        return Result.success(logService.dailyStatistics(effectiveUserId, startTime, endTime));
     }
 }

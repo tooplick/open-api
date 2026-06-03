@@ -1,420 +1,166 @@
 /* ============================================================
-   AI Open Platform 控制台 — 全局样式 / 轻量设计系统(无 UI 组件库)
-   设计语言:Lumina Nexus — "Paper-Technical / Daylight Workspace"
-   浅色、近单色钢灰调,柔和漫散阴影,圆润(pill)几何。
+   AI Open Platform 控制台 — 全局样式
+   设计语言:Indigo Workspace — 现代 SaaS 浅色(无暗色)
+   基于 Tailwind v4 + shadcn-vue;靛蓝品牌色 + zinc 中性色阶。
    ============================================================ */
 
-:root {
-  /* —— 主色:Steel Grey —— */
-  --color-primary: #5a5c61;
-  --color-primary-hover: #45474b;
-  --color-primary-soft: #e7e7ec; /* 浅钢灰底:徽章 / 高亮框 / 焦点环填充 */
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
-  /* —— 语义色(浅底高对比) —— */
-  --color-danger: #ba1a1a;
-  --color-danger-hover: #93000a;
-  --color-danger-soft: #ffdad6;
-  --color-success: #1b7a4b;
-  --color-success-soft: #e3f3ea;
-  --color-warning: #8a6500;
-  --color-warning-soft: #f6efda;
+@layer base {
+  :root {
+    --radius: 0.75rem;
 
-  /* —— 中性 / 表面(Studio Light) —— */
-  --color-bg: #f0eded; /* 画布(surface-container) */
-  --color-surface: #ffffff; /* 卡片 / 输入 / 弹窗 / 侧栏 / 顶栏 */
-  --color-hover: #f3f0f0; /* 行 / 幽灵按钮 hover 浅填充 */
-  --color-border: #e4e2e2; /* 细分隔线 */
-  --color-border-strong: #c6c6cb; /* 输入 / 可点击元素描边(outline-variant) */
-  --color-text: #1b1c1c; /* on-surface */
-  --color-text-soft: #45474a; /* on-surface-variant */
-  --color-text-faint: #76777b; /* outline:次要文本 / 占位 */
+    --background: #f7f7f8;
+    --foreground: #18181b;
 
-  /* —— 侧边栏(浅色) —— */
-  --sidebar-bg: #ffffff;
-  --sidebar-text: #45474a;
-  --sidebar-text-active: #ffffff;
-  --sidebar-active-bg: var(--color-primary);
-  --sidebar-hover-bg: #f0eded;
+    --card: #ffffff;
+    --card-foreground: #18181b;
+    --popover: #ffffff;
+    --popover-foreground: #18181b;
 
-  /* —— 圆角(Organic-Technical / Pill) —— */
-  --radius-sm: 8px; /* 0.5rem */
-  --radius: 16px; /* 1rem — 按钮 / 输入 / 卡片 */
-  --radius-md: 24px; /* 1.5rem */
-  --radius-lg: 32px; /* 2rem — 弹窗 */
-  --radius-full: 9999px;
+    --primary: #4f46e5;
+    --primary-foreground: #ffffff;
 
-  /* —— 阴影(柔和、漫散,~10% 不透明度) —— */
-  --shadow-sm: 0 1px 2px rgba(27, 28, 28, 0.05);
-  --shadow: 0 4px 16px rgba(27, 28, 28, 0.07);
-  --shadow-lg: 0 16px 48px rgba(27, 28, 28, 0.14);
-  --ring: 0 0 0 3px rgba(90, 92, 97, 0.18); /* 输入焦点柔光环 */
+    --secondary: #f4f4f5;
+    --secondary-foreground: #3f3f46;
 
-  /* —— 字体 —— */
+    --muted: #f4f4f5;
+    --muted-foreground: #71717a;
+
+    --accent: #eef2ff;
+    --accent-foreground: #312e81;
+
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+
+    --border: #e5e7eb;
+    --input: #d4d4d8;
+    --ring: #6366f1;
+
+    /* 徽章 soft 色(无 shadcn 对应,自定义) */
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --warning: #d97706;
+    --warning-soft: #fef3c7;
+    --danger-soft: #fee2e2;
+    --primary-soft: #eef2ff;
+
+    /* 侧边栏(shadcn sidebar 专用语义变量,靛蓝高亮) */
+    --sidebar: #ffffff;
+    --sidebar-foreground: #18181b;
+    --sidebar-primary: #4f46e5;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #eef2ff;
+    --sidebar-accent-foreground: #312e81;
+    --sidebar-border: #e5e7eb;
+    --sidebar-ring: #6366f1;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger-soft: var(--danger-soft);
+  --color-primary-soft: var(--primary-soft);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
   --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Microsoft YaHei', 'Hiragino Sans GB', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-
-  --sidebar-width: 240px;
-  --header-height: 64px;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html,
+  body,
+  #app {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
 }
 
-html,
-body,
-#app {
-  height: 100%;
-  margin: 0;
+@layer components {
+  /* 登录 / 首次登录全屏页背景:靛蓝氛围晕染,取主题 token */
+  .app-auth-bg {
+    background:
+      radial-gradient(120% 90% at 50% -10%, var(--accent) 0%, transparent 55%),
+      var(--background);
+  }
 }
 
-body {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--color-text);
-  background: var(--color-bg);
-  -webkit-font-smoothing: antialiased;
-}
+@layer base {
+  /* 自定义滚动条:细、圆角、随主题 token */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 30%, transparent) transparent;
+  }
 
-/* 表单/按钮控件默认不继承字体,显式继承以应用 Geist */
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-}
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
 
-h1,
-h2,
-h3,
-h4,
-p {
-  margin: 0;
-}
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-a {
-  color: var(--color-primary);
-  text-decoration: none;
-}
+  *::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 9999px;
+  }
 
-/* ----------------------- 按钮 ----------------------- */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 18px;
-  font-size: 14px;
-  font-weight: 500;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s, box-shadow 0.15s;
-}
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+  }
 
-.btn:hover {
-  background: var(--color-hover);
-  border-color: var(--color-text-faint);
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
-.btn-danger {
-  background: var(--color-danger);
-  border-color: var(--color-danger);
-  color: #fff;
-}
-
-.btn-danger:hover {
-  background: var(--color-danger-hover);
-  border-color: var(--color-danger-hover);
-}
-
-.btn-ghost {
-  background: transparent;
-  border-color: transparent;
-  color: var(--color-text-soft);
-  padding: 0 10px;
-}
-
-.btn-ghost:hover {
-  background: var(--color-hover);
-  color: var(--color-text);
-}
-
-.btn-sm {
-  height: 30px;
-  padding: 0 14px;
-  font-size: 13px;
-}
-
-.btn-block {
-  width: 100%;
-}
-
-/* 表格操作列:相邻按钮之间留出间距(避免紧贴) */
-.table td .btn + .btn {
-  margin-left: 10px;
-}
-
-/* ----------------------- 表单 ----------------------- */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 18px;
-}
-
-.field-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-soft);
-}
-
-.field-label .req {
-  color: var(--color-danger);
-  margin-left: 2px;
-}
-
-.field-hint {
-  font-size: 12px;
-  color: var(--color-text-faint);
-}
-
-.field-error {
-  font-size: 12px;
-  color: var(--color-danger);
-}
-
-.input,
-.select,
-.textarea {
-  width: 100%;
-  height: 40px;
-  padding: 0 14px;
-  font-size: 14px;
-  font-family: inherit;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.textarea {
-  height: auto;
-  padding: 10px 14px;
-  resize: vertical;
-  min-height: 76px;
-}
-
-.input:focus,
-.select:focus,
-.textarea:focus {
-  border-color: var(--color-primary);
-  box-shadow: var(--ring);
-}
-
-.input::placeholder,
-.textarea::placeholder {
-  color: var(--color-text-faint);
-}
-
-.input:disabled {
-  background: var(--color-bg);
-  color: var(--color-text-soft);
-}
-
-/* ----------------------- 卡片 ----------------------- */
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden; /* 让内部表格四角贴合圆角 */
-}
-
-.card-pad {
-  padding: 24px;
-}
-
-/* ----------------------- 表格 ----------------------- */
-.table-wrap {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.table th,
-.table td {
-  padding: 14px 20px;
-  text-align: left;
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
-}
-
-.table th {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--color-text-soft);
-  background: var(--color-hover);
-}
-
-.table tbody tr:hover {
-  background: var(--color-hover);
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.table td.wrap {
-  white-space: normal;
-  max-width: 360px;
-}
-
-.table-empty {
-  padding: 48px 16px;
-  text-align: center;
-  color: var(--color-text-faint);
-}
-
-/* ----------------------- 徽章 ----------------------- */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: var(--radius-full);
-  line-height: 1.6;
-}
-
-.badge-green {
-  background: var(--color-success-soft);
-  color: var(--color-success);
-}
-
-.badge-red {
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-}
-
-.badge-gray {
-  background: var(--color-bg);
-  color: var(--color-text-soft);
-}
-
-.badge-indigo {
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-}
-
-.badge-amber {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
-}
-
-/* ----------------------- 辅助类 ----------------------- */
-.row {
-  display: flex;
-  align-items: center;
-}
-
-.gap-8 {
-  gap: 8px;
-}
-
-.gap-12 {
-  gap: 12px;
-}
-
-.spread {
-  justify-content: space-between;
-}
-
-.muted {
-  color: var(--color-text-soft);
-}
-
-.faint {
-  color: var(--color-text-faint);
-}
-
-.mono {
-  font-family: var(--font-mono);
-}
-
-.text-right {
-  text-align: right;
-}
-
-.nowrap {
-  white-space: nowrap;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.page-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-/* 简单加载/空状态 */
-.state-box {
-  padding: 56px 16px;
-  text-align: center;
-  color: var(--color-text-faint);
-}
-
-.spinner {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--color-border-strong);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  vertical-align: middle;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }

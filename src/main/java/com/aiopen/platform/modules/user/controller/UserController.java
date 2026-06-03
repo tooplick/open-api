@@ -3,7 +3,10 @@ package com.aiopen.platform.modules.user.controller;
 import com.aiopen.platform.common.result.PageResult;
 import com.aiopen.platform.common.result.Result;
 import com.aiopen.platform.modules.user.dto.ChangePasswordRequest;
+import com.aiopen.platform.modules.user.dto.InitialCredentialsRequest;
+import com.aiopen.platform.modules.user.dto.LoginResponse;
 import com.aiopen.platform.modules.user.entity.User;
+import com.aiopen.platform.modules.user.service.AuthService;
 import com.aiopen.platform.modules.user.service.UserService;
 import com.aiopen.platform.security.AuthUser;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -21,11 +24,19 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final AuthService authService;
 
     /** 当前登录用户信息 */
     @GetMapping("/me")
     public Result<User> me(@AuthenticationPrincipal AuthUser principal) {
         return Result.success(userService.getById(principal.getId()));
+    }
+
+    /** 首次登录:强制修改初始账号与密码,返回新 token(因用户名变更旧 token 失效) */
+    @PutMapping("/initial-credentials")
+    public Result<LoginResponse> initialCredentials(@AuthenticationPrincipal AuthUser principal,
+                                                    @Valid @RequestBody InitialCredentialsRequest request) {
+        return Result.success(authService.changeInitialCredentials(principal.getId(), request));
     }
 
     /** 修改自己的密码 */

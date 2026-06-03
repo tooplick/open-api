@@ -6,6 +6,7 @@ import com.aiopen.platform.modules.log.entity.Log;
 import com.aiopen.platform.modules.log.service.LogService;
 import com.aiopen.platform.modules.relay.RelayAuthService;
 import com.aiopen.platform.modules.relay.RelayContext;
+import com.aiopen.platform.modules.relay.RelayMetrics;
 import com.aiopen.platform.modules.relay.Usage;
 import com.aiopen.platform.modules.relay.exception.RelayException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -94,28 +95,35 @@ public class AnthropicRelayService {
         String upstreamKey = resolveUpstreamKey(channel);
 
         Usage usage = new Usage();
-        int status;
+        RelayMetrics metrics = new RelayMetrics();
+        long upstreamStart = System.currentTimeMillis();
         try {
-            status = stream
-                    ? forwardStreaming(url, upstreamKey, upstreamBody, model, response, usage)
-                    : forwardBlocking(url, upstreamKey, upstreamBody, model, response, usage);
+            if (stream) {
+                forwardStreaming(url, upstreamKey, upstreamBody, model, response, usage, metrics, upstreamStart);
+            } else {
+                forwardBlocking(url, upstreamKey, upstreamBody, model, response, usage, metrics, upstreamStart);
+            }
         } catch (Exception e) {
+            metrics.upstreamMs = System.currentTimeMillis() - upstreamStart;
             log.error("Anthropic 入站转发失败 channel={} url={}: {}", channel.getName(), url, e.getMessage());
-            recordLog(ctx, channel, model, 2, usage, System.currentTimeMillis() - start, request,
-                    "上游请求异常: " + e.getMessage());
+            recordLog(ctx, channel, model, upstreamModel, stream, 2, usage,
+                    System.currentTimeMillis() - start, request, metrics, "上游请求异常: " + e.getMessage());
             if (!response.isCommitted()) {
                 throw new RelayException(502, "api_error", "上游渠道请求失败");
             }
             return;
         }
+        metrics.upstreamMs = System.currentTimeMillis() - upstreamStart;
 
-        boolean success = status >= 200 && status < 300;
-        recordLog(ctx, channel, model, success ? 1 : 2, usage,
-                System.currentTimeMillis() - start, request, success ? null : "上游返回状态 " + status);
+        boolean success = metrics.status >= 200 && metrics.status < 300;
+        recordLog(ctx, channel, model, upstreamModel, stream, success ? 1 : 2, usage,
+                System.currentTimeMillis() - start, request, metrics,
+                success ? null : "上游返回状态 " + metrics.status);
     }
 
-    private int forwardBlocking(String url, String upstreamKey, byte[] upstreamBody, String requestedModel,
-                                HttpServletResponse response, Usage usage) throws IOException {
+    private void forwardBlocking(String url, String upstreamKey, byte[] upstreamBody, String requestedModel,
+                                 HttpServletResponse response, Usage usage, RelayMetrics metrics, long upstreamStart)
+            throws IOException {
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
@@ -124,7 +132,9 @@ public class AnthropicRelayService {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(upstreamBody))
                 .build();
         HttpResponse<byte[]> resp = send(req, HttpResponse.BodyHandlers.ofByteArray());
+        metrics.ttfbMs = System.currentTimeMillis() - upstreamStart;
         int code = resp.statusCode();
+        metrics.status = code;
         response.setStatus(code);
         response.setContentType("application/json;charset=utf-8");
         byte[] out = (code >= 200 && code < 300)
@@ -133,11 +143,11 @@ public class AnthropicRelayService {
         OutputStream os = response.getOutputStream();
         os.write(out);
         os.flush();
-        return code;
     }
 
-    private int forwardStreaming(String url, String upstreamKey, byte[] upstreamBody, String requestedModel,
-                                 HttpServletResponse response, Usage usage) throws IOException {
+    private void forwardStreaming(String url, String upstreamKey, byte[] upstreamBody, String requestedModel,
+                                  HttpServletResponse response, Usage usage, RelayMetrics metrics, long upstreamStart)
+            throws IOException {
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
@@ -147,6 +157,7 @@ public class AnthropicRelayService {
                 .build();
         HttpResponse<InputStream> resp = send(req, HttpResponse.BodyHandlers.ofInputStream());
         int code = resp.statusCode();
+        metrics.status = code;
         response.setStatus(code);
         if (code >= 200 && code < 300) {
             response.setContentType("text/event-stream;charset=utf-8");
@@ -159,7 +170,12 @@ public class AnthropicRelayService {
                 writer.write(converter.streamStart(state));
                 writer.flush();
                 String line;
+                boolean first = true;
                 while ((line = reader.readLine()) != null) {
+                    if (first) {
+                        metrics.ttfbMs = System.currentTimeMillis() - upstreamStart;
+                        first = false;
+                    }
                     String out = converter.streamDelta(line, state, usage);
                     if (out != null) {
                         writer.write(out);
@@ -170,13 +186,13 @@ public class AnthropicRelayService {
                 writer.flush();
             }
         } else {
+            metrics.ttfbMs = System.currentTimeMillis() - upstreamStart;
             byte[] err = StreamUtils.copyToByteArray(resp.body());
             response.setContentType("application/json;charset=utf-8");
             OutputStream os = response.getOutputStream();
             os.write(converter.errorJson(code, upstreamErrorMessage(err, code)));
             os.flush();
         }
-        return code;
     }
 
     private String extractKey(HttpServletRequest request) {
@@ -264,8 +280,9 @@ public class AnthropicRelayService {
         }
     }
 
-    private void recordLog(RelayContext ctx, Channel channel, String model, int type, Usage usage,
-                           long durationMs, HttpServletRequest request, String content) {
+    private void recordLog(RelayContext ctx, Channel channel, String model, String upstreamModel, boolean stream,
+                           int type, Usage usage, long durationMs, HttpServletRequest request,
+                           RelayMetrics metrics, String content) {
         try {
             Log logEntry = new Log();
             logEntry.setUserId(ctx.getUser().getId());
@@ -274,18 +291,34 @@ public class AnthropicRelayService {
             logEntry.setChannelId(channel.getId());
             logEntry.setChannelName(channel.getName());
             logEntry.setModelName(model);
+            logEntry.setUpstreamModel(upstreamModel);
+            logEntry.setStream(stream ? 1 : 0);
+            logEntry.setEndpoint(request.getRequestURI());
+            logEntry.setUserAgent(truncate(request.getHeader("User-Agent"), 255));
             logEntry.setType(type);
             logEntry.setPromptTokens(usage.promptTokens);
             logEntry.setCompletionTokens(usage.completionTokens);
             logEntry.setTotalTokens(usage.totalTokens);
             logEntry.setDurationMs(durationMs);
+            if (metrics != null) {
+                logEntry.setHttpStatus(metrics.status);
+                logEntry.setTtfbMs(metrics.ttfbMs);
+                logEntry.setUpstreamMs(metrics.upstreamMs);
+            }
             logEntry.setRequestId(UUID.randomUUID().toString());
             logEntry.setIp(getClientIp(request));
-            logEntry.setContent(content);
+            logEntry.setContent(truncate(content, 1000));
             logService.record(logEntry);
         } catch (Exception e) {
             log.warn("写调用日志失败: {}", e.getMessage());
         }
+    }
+
+    private String truncate(String s, int max) {
+        if (s == null) {
+            return null;
+        }
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private String getClientIp(HttpServletRequest request) {

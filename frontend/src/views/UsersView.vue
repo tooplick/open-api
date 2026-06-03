@@ -1,15 +1,35 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { pageUsers, updateUserStatus } from '@/api/user'
 import type { User } from '@/types'
 import { useAuthStore } from '@/stores/auth'
-import BasePagination from '@/components/BasePagination.vue'
-import { toast } from '@/composables/useToast'
 import { formatDateTime } from '@/utils/format'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 
 const auth = useAuthStore()
 const list = ref<User[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const total = ref(0)
 const current = ref(1)
 const size = ref(10)
@@ -62,62 +82,94 @@ onMounted(() => void load())
 
 <template>
   <div>
-    <div class="row spread" style="margin-bottom: 24px; flex-wrap: wrap; gap: 12px">
-      <form class="row gap-8" @submit.prevent="doSearch">
-        <input v-model="search" class="input" style="width: 220px" placeholder="搜索用户名" />
-        <button class="btn" type="submit">搜索</button>
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+      <form class="flex items-center gap-2" @submit.prevent="doSearch">
+        <Input v-model="search" class="w-[220px]" placeholder="搜索用户名" />
+        <Button variant="outline" type="submit">搜索</Button>
       </form>
     </div>
 
-    <div class="card">
-      <div v-if="loading" class="state-box"><span class="spinner" /> 加载中…</div>
-      <div v-else-if="list.length === 0" class="state-box">暂无用户</div>
-      <div v-else class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>用户名</th>
-              <th>邮箱</th>
-              <th>角色</th>
-              <th>状态</th>
-              <th>注册时间</th>
-              <th class="text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="u in list" :key="u.id">
-              <td>{{ u.id }}</td>
-              <td>{{ u.username }}</td>
-              <td>{{ u.email || '—' }}</td>
-              <td>
-                <span :class="['badge', u.role === 'admin' ? 'badge-indigo' : 'badge-gray']">
+    <Card class="gap-0 overflow-hidden p-0">
+      <div v-if="loading" class="space-y-3 p-4">
+        <Skeleton v-for="i in 6" :key="i" class="h-12 w-full" />
+      </div>
+      <div v-else-if="list.length === 0" class="px-4 py-14 text-center text-muted-foreground">
+        暂无用户
+      </div>
+      <template v-else>
+        <div class="overflow-x-auto">
+          <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>用户名</TableHead>
+              <TableHead>邮箱</TableHead>
+              <TableHead>角色</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead>注册时间</TableHead>
+              <TableHead class="text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="u in list" :key="u.id">
+              <TableCell>{{ u.id }}</TableCell>
+              <TableCell>{{ u.username }}</TableCell>
+              <TableCell>{{ u.email || '—' }}</TableCell>
+              <TableCell>
+                <Badge :variant="u.role === 'admin' ? 'info' : 'muted'">
                   {{ u.role === 'admin' ? '管理员' : '普通用户' }}
-                </span>
-              </td>
-              <td>
-                <span :class="['badge', u.status === 1 ? 'badge-green' : 'badge-red']">
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge :variant="u.status === 1 ? 'success' : 'danger'">
                   {{ u.status === 1 ? '启用' : '禁用' }}
-                </span>
-              </td>
-              <td>{{ formatDateTime(u.createTime) }}</td>
-              <td class="text-right nowrap">
-                <button
-                  class="btn btn-sm"
-                  type="button"
+                </Badge>
+              </TableCell>
+              <TableCell>{{ formatDateTime(u.createTime) }}</TableCell>
+              <TableCell class="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
                   :disabled="u.id === auth.user?.id"
                   @click="toggle(u)"
                 >
                   {{ u.status === 1 ? '禁用' : '启用' }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card-pad" style="padding-top: 0">
-        <BasePagination :current="current" :size="size" :total="total" @update:current="goPage" />
-      </div>
-    </div>
+                </Button>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+          </Table>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+          <span class="text-sm text-muted-foreground">共 {{ total }} 条</span>
+          <Pagination
+            v-slot="{ page }"
+            :page="current"
+            :items-per-page="size"
+            :total="total"
+            :sibling-count="1"
+            show-edges
+            class="mx-0 w-auto"
+            @update:page="goPage"
+          >
+            <PaginationContent v-slot="{ items }">
+              <PaginationPrevious>上一页</PaginationPrevious>
+              <template v-for="(item, idx) in items" :key="idx">
+                <PaginationItem
+                  v-if="item.type === 'page'"
+                  :value="item.value"
+                  :is-active="item.value === page"
+                >
+                  {{ item.value }}
+                </PaginationItem>
+                <PaginationEllipsis v-else :index="idx" />
+              </template>
+              <PaginationNext>下一页</PaginationNext>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      </template>
+    </Card>
   </div>
 </template>

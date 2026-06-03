@@ -1,207 +1,339 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import {
+  ActivityIcon,
+  ArrowDownToLineIcon,
+  ArrowUpFromLineIcon,
+  BoxesIcon,
+  KeyRoundIcon,
+  LayersIcon,
+  NetworkIcon,
+  ScrollTextIcon,
+} from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
-import { logStatistics } from '@/api/log'
-import type { LogStat } from '@/types'
+import { dailyLogStatistics, logStatistics } from '@/api/log'
+import type { DailyStat, LogStat } from '@/types'
 import { formatNumber } from '@/utils/format'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import type { ChartConfig } from '@/components/ui/chart'
+import {
+  ChartContainer,
+  ChartCrosshair,
+  ChartTooltipContent,
+  componentToString,
+} from '@/components/ui/chart'
+import { VisArea, VisAxis, VisLine, VisXYContainer } from '@unovis/vue'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const auth = useAuthStore()
 const stat = ref<LogStat | null>(null)
-const loading = ref(false)
+const loading = ref(true)
 
-const ranges = [
-  { key: 'all', label: '全部' },
-  { key: '7d', label: '近 7 天' },
-  { key: '30d', label: '近 30 天' },
-] as const
-const range = ref<'all' | '7d' | '30d'>('all')
+const trendDaily = ref<DailyStat[]>([])
+const trendLoading = ref(true)
+const metric = ref<'requests' | 'tokens'>('requests')
 
-function startTimeFor(key: 'all' | '7d' | '30d'): string | undefined {
-  if (key === 'all') return undefined
-  const d = new Date()
-  d.setDate(d.getDate() - (key === '7d' ? 7 : 30))
-  d.setHours(0, 0, 0, 0)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T00:00:00`
+type RangeKey = 'all' | '7d' | '30d'
+const range = ref<RangeKey>('7d')
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0')
 }
 
-async function load(): Promise<void> {
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function startTimeFor(key: RangeKey): string | undefined {
+  if (key === 'all') return undefined
+  const d = new Date()
+  d.setDate(d.getDate() - (key === '7d' ? 6 : 29))
+  d.setHours(0, 0, 0, 0)
+  return `${dateKey(d)}T00:00:00`
+}
+
+function lastNDates(n: number): string[] {
+  const out: string[] = []
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  for (let i = n - 1; i >= 0; i--) {
+    const x = new Date(d)
+    x.setDate(d.getDate() - i)
+    out.push(dateKey(x))
+  }
+  return out
+}
+
+const chartData = computed(() => {
+  const map = new Map<string, number>()
+  for (const d of trendDaily.value) {
+    if (!d.date) continue
+    map.set(d.date, (metric.value === 'requests' ? d.requests : d.totalTokens) || 0)
+  }
+  let keys: string[]
+  if (range.value === 'all') {
+    keys = [...map.keys()].sort().slice(-30)
+    if (keys.length === 0) keys = [dateKey(new Date())]
+  }
+  else {
+    keys = lastNDates(range.value === '7d' ? 7 : 30)
+  }
+  return keys.map(k => ({ label: k.slice(5), value: map.get(k) ?? 0 }))
+})
+
+interface ChartPoint {
+  x: number
+  label: string
+  value: number
+}
+
+const series = computed<ChartPoint[]>(() =>
+  chartData.value.map((d, i) => ({ x: i, label: d.label, value: d.value })),
+)
+
+const yMax = computed(() => {
+  const max = Math.max(0, ...series.value.map(p => p.value))
+  return max <= 0 ? 10 : Math.ceil(max * 1.15)
+})
+
+const xTicks = computed<number[]>(() => {
+  const n = series.value.length
+  if (n <= 1) return [0]
+  const count = Math.min(6, n)
+  const step = (n - 1) / (count - 1)
+  const out = new Set<number>()
+  for (let i = 0; i < count; i++) out.add(Math.round(i * step))
+  return [...out].sort((a, b) => a - b)
+})
+
+const chartConfig = computed<ChartConfig>(() => ({
+  value: {
+    label: metric.value === 'requests' ? '请求数' : 'Tokens',
+    color: 'var(--primary)',
+  },
+}))
+
+const areaDefs = `
+  <linearGradient id="aiopen-area-fill" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="5%" stop-color="var(--primary)" stop-opacity="0.45" />
+    <stop offset="95%" stop-color="var(--primary)" stop-opacity="0.04" />
+  </linearGradient>
+`
+
+const cards = computed(() => [
+  { key: 'requests', label: '请求数', value: stat.value?.requests, icon: ActivityIcon },
+  { key: 'total', label: '总 Tokens', value: stat.value?.totalTokens, icon: LayersIcon },
+  { key: 'prompt', label: '输入 Tokens', value: stat.value?.promptTokens, icon: ArrowUpFromLineIcon },
+  { key: 'completion', label: '输出 Tokens', value: stat.value?.completionTokens, icon: ArrowDownToLineIcon },
+])
+
+const quickLinks = computed(() => [
+  { name: 'keys', label: '创建 / 管理 API Key', icon: KeyRoundIcon },
+  { name: 'models', label: '查看可用模型', icon: BoxesIcon },
+  { name: 'logs', label: '查看调用日志', icon: ScrollTextIcon },
+  ...(auth.isAdmin ? [{ name: 'channels', label: '配置上游渠道', icon: NetworkIcon }] : []),
+])
+
+async function loadStat(): Promise<void> {
   loading.value = true
   try {
     stat.value = await logStatistics({ startTime: startTimeFor(range.value) })
-  } catch {
+  }
+  catch {
     stat.value = null
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
-function pick(key: 'all' | '7d' | '30d'): void {
-  range.value = key
-  void load()
+async function loadTrend(): Promise<void> {
+  trendLoading.value = true
+  try {
+    trendDaily.value = await dailyLogStatistics({ startTime: startTimeFor(range.value) })
+  }
+  catch {
+    trendDaily.value = []
+  }
+  finally {
+    trendLoading.value = false
+  }
+}
+
+function reload(): void {
+  void loadStat()
+  void loadTrend()
+}
+
+function setRange(v: unknown): void {
+  range.value = v as RangeKey
+  reload()
+}
+
+function setMetric(v: unknown): void {
+  metric.value = v as 'requests' | 'tokens'
 }
 
 onMounted(() => {
-  void load()
+  reload()
   void auth.refreshMe().catch(() => undefined)
 })
 </script>
 
 <template>
-  <div class="dash">
-    <div class="row spread" style="margin-bottom: 32px; flex-wrap: wrap; gap: 12px">
+  <div class="space-y-8">
+    <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <div class="page-title">你好,{{ auth.user?.username }}</div>
-        <div class="muted" style="margin-top: 6px">
+        <h2 class="text-2xl font-semibold tracking-tight">
+          你好,{{ auth.user?.username }}
+        </h2>
+        <p class="text-muted-foreground mt-1.5">
           {{ auth.isAdmin ? '平台用量总览(全部用户)' : '我的调用用量总览' }}
-        </div>
+        </p>
       </div>
-      <div class="seg">
-        <button
-          v-for="r in ranges"
-          :key="r.key"
-          :class="['seg-btn', { active: range === r.key }]"
-          type="button"
-          @click="pick(r.key)"
+      <Tabs :model-value="range" @update:model-value="setRange">
+        <TabsList>
+          <TabsTrigger value="all">
+            全部
+          </TabsTrigger>
+          <TabsTrigger value="7d">
+            近 7 天
+          </TabsTrigger>
+          <TabsTrigger value="30d">
+            近 30 天
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
+
+    <div class="grid grid-cols-4 gap-6 max-xl:grid-cols-2 max-sm:grid-cols-1">
+      <Card v-for="c in cards" :key="c.key">
+        <CardContent>
+          <div class="flex items-center justify-between">
+            <span class="text-muted-foreground text-sm">{{ c.label }}</span>
+            <span class="bg-muted text-muted-foreground flex size-9 items-center justify-center rounded-lg">
+              <component :is="c.icon" class="size-4.5" />
+            </span>
+          </div>
+          <Skeleton v-if="loading" class="mt-3 h-8 w-24" />
+          <div v-else class="mt-2 text-3xl font-semibold tracking-tight">
+            {{ formatNumber(c.value) }}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    <Card>
+      <CardHeader class="flex-row items-center justify-between gap-3 space-y-0">
+        <div>
+          <CardTitle>调用趋势</CardTitle>
+          <CardDescription>
+            {{ range === 'all' ? '按出现的日期聚合' : `近 ${range === '7d' ? 7 : 30} 天每日` }}{{ metric === 'requests' ? '请求数' : ' Token 用量' }}
+          </CardDescription>
+        </div>
+        <Tabs :model-value="metric" @update:model-value="setMetric">
+          <TabsList>
+            <TabsTrigger value="requests">
+              请求数
+            </TabsTrigger>
+            <TabsTrigger value="tokens">
+              Tokens
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </CardHeader>
+      <CardContent>
+        <Skeleton v-if="trendLoading" class="h-[240px] w-full" />
+        <ChartContainer
+          v-else
+          :config="chartConfig"
+          class="aspect-auto h-[240px] w-full"
+          :cursor="true"
         >
-          {{ r.label }}
-        </button>
-      </div>
-    </div>
+          <VisXYContainer :data="series" :svg-defs="areaDefs" :y-domain="[0, yMax]">
+            <VisArea
+              :x="(d: ChartPoint) => d.x"
+              :y="(d: ChartPoint) => d.value"
+              color="url(#aiopen-area-fill)"
+            />
+            <VisLine
+              :x="(d: ChartPoint) => d.x"
+              :y="(d: ChartPoint) => d.value"
+              color="var(--primary)"
+              :line-width="2"
+            />
+            <VisAxis
+              type="x"
+              :x="(d: ChartPoint) => d.x"
+              :tick-values="xTicks"
+              :tick-line="false"
+              :domain-line="false"
+              :grid-line="false"
+              :tick-format="(v: number) => series[Math.round(v)]?.label ?? ''"
+            />
+            <VisAxis
+              type="y"
+              :num-ticks="3"
+              :tick-line="false"
+              :domain-line="false"
+              :tick-format="(v: number) => formatNumber(v)"
+            />
+            <ChartCrosshair
+              color="var(--primary)"
+              :template="componentToString(chartConfig, ChartTooltipContent, {
+                labelFormatter: (d: number | Date) => series[Math.round(Number(d))]?.label ?? '',
+              })"
+            />
+          </VisXYContainer>
+        </ChartContainer>
+      </CardContent>
+    </Card>
 
-    <div class="stat-grid">
-      <div class="card card-pad stat">
-        <div class="stat-label">请求数</div>
-        <div class="stat-value">{{ formatNumber(stat?.requests) }}</div>
-      </div>
-      <div class="card card-pad stat">
-        <div class="stat-label">总 Tokens</div>
-        <div class="stat-value">{{ formatNumber(stat?.totalTokens) }}</div>
-      </div>
-      <div class="card card-pad stat">
-        <div class="stat-label">输入 / 输出 Tokens</div>
-        <div class="stat-value sm">
-          {{ formatNumber(stat?.promptTokens) }}
-          <span class="faint">/</span>
-          {{ formatNumber(stat?.completionTokens) }}
-        </div>
-      </div>
-    </div>
+    <div class="grid grid-cols-2 gap-6 max-lg:grid-cols-1">
+      <Card>
+        <CardHeader>
+          <CardTitle>我的账户</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="divide-border divide-y">
+            <div class="flex items-center justify-between py-3.5">
+              <span class="text-muted-foreground">角色</span>
+              <Badge :variant="auth.isAdmin ? 'info' : 'muted'">
+                {{ auth.isAdmin ? '管理员' : '普通用户' }}
+              </Badge>
+            </div>
+            <div class="flex items-center justify-between py-3.5">
+              <span class="text-muted-foreground">邮箱</span>
+              <span>{{ auth.user?.email || '—' }}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-    <div class="dash-cols">
-      <div class="card card-pad">
-        <h3 class="block-title">我的账户</h3>
-        <div class="kv">
-          <span class="muted">角色</span>
-          <span :class="['badge', auth.isAdmin ? 'badge-indigo' : 'badge-gray']">
-            {{ auth.isAdmin ? '管理员' : '普通用户' }}
-          </span>
-        </div>
-        <div class="kv">
-          <span class="muted">邮箱</span>
-          <span>{{ auth.user?.email || '—' }}</span>
-        </div>
-      </div>
-
-      <div class="card card-pad">
-        <h3 class="block-title">快捷入口</h3>
-        <div class="quick">
-          <RouterLink class="quick-item" :to="{ name: 'keys' }">创建 / 管理 API Key →</RouterLink>
-          <RouterLink class="quick-item" :to="{ name: 'models' }">查看可用模型 →</RouterLink>
-          <RouterLink class="quick-item" :to="{ name: 'logs' }">查看调用日志 →</RouterLink>
-          <RouterLink v-if="auth.isAdmin" class="quick-item" :to="{ name: 'channels' }">
-            配置上游渠道 →
-          </RouterLink>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>快捷入口</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="grid gap-2">
+            <RouterLink
+              v-for="link in quickLinks"
+              :key="link.name"
+              :to="{ name: link.name }"
+              class="hover:bg-accent flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors"
+            >
+              <span class="bg-muted text-muted-foreground flex size-8 items-center justify-center rounded-md">
+                <component :is="link.icon" class="size-4" />
+              </span>
+              <span class="flex-1">{{ link.label }}</span>
+              <span class="text-muted-foreground">→</span>
+            </RouterLink>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   </div>
 </template>
-
-<style scoped>
-.seg {
-  display: inline-flex;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.seg-btn {
-  padding: 7px 14px;
-  border: none;
-  background: var(--color-surface);
-  color: var(--color-text-soft);
-  cursor: pointer;
-  font-size: 13px;
-  border-left: 1px solid var(--color-border);
-}
-.seg-btn:first-child {
-  border-left: none;
-}
-.seg-btn.active {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  margin-bottom: 24px;
-}
-.stat-label {
-  font-size: 13px;
-  color: var(--color-text-soft);
-  margin-bottom: 8px;
-}
-.stat-value {
-  font-size: 26px;
-  font-weight: 600;
-}
-.stat-value.sm {
-  font-size: 20px;
-}
-
-.dash-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-.block-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 18px;
-}
-.kv {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.kv:last-child {
-  border-bottom: none;
-}
-.quick {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.quick-item {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-primary);
-}
-.quick-item:last-child {
-  border-bottom: none;
-}
-
-@media (max-width: 980px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .dash-cols {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

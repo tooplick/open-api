@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useForm } from 'vee-validate'
+import { toTypedSchema } from '@vee-validate/zod'
+import * as z from 'zod'
+import { toast } from 'vue-sonner'
 import {
   createChannel,
   deleteChannel,
@@ -9,26 +13,105 @@ import {
   updateChannelStatus,
 } from '@/api/channel'
 import type { Channel, ChannelRequest } from '@/types'
-import BaseModal from '@/components/BaseModal.vue'
-import BasePagination from '@/components/BasePagination.vue'
-import { toast } from '@/composables/useToast'
-import { confirmDialog } from '@/composables/useConfirm'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Spinner } from '@/components/ui/spinner'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
+import { MoreHorizontalIcon } from '@lucide/vue'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 
 const list = ref<Channel[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const total = ref(0)
 const current = ref(1)
 const size = ref(10)
 const search = ref('')
 
 const showForm = ref(false)
-const saving = ref(false)
 const editingId = ref<number | null>(null)
+const channelType = ref('openai')
 const fetchedModels = ref<string[]>([])
 const fetchingModels = ref(false)
-const form = reactive<ChannelRequest>({
+
+const deleteTarget = ref<Channel | null>(null)
+const showDelete = ref(false)
+
+const formSchema = computed(() =>
+  toTypedSchema(
+    z.object({
+      name: z.string().min(1, '请输入渠道名称'),
+      baseUrl: z.string().min(1, '请输入上游地址'),
+      apiKey: editingId.value ? z.string().optional() : z.string().min(1, '请填写上游密钥'),
+      models: z.string().min(1, '请填写支持的模型'),
+      group: z.string().optional(),
+      modelMapping: z.string().optional(),
+      weight: z.coerce.number().min(1, '权重至少为 1'),
+      priority: z.coerce.number(),
+      status: z.string(),
+    }),
+  ),
+)
+
+const defaults = {
   name: '',
-  type: 'openai',
   baseUrl: '',
   apiKey: '',
   models: '',
@@ -36,7 +119,12 @@ const form = reactive<ChannelRequest>({
   modelMapping: '',
   weight: 1,
   priority: 0,
-  status: 1,
+  status: '1',
+}
+
+const { values, setFieldValue, handleSubmit, isSubmitting, resetForm } = useForm({
+  validationSchema: formSchema,
+  initialValues: { ...defaults },
 })
 
 function parseModels(csv: string): string[] {
@@ -46,42 +134,39 @@ function parseModels(csv: string): string[] {
     .filter(Boolean)
 }
 
-const selectedSet = computed(() => new Set(parseModels(form.models)))
+const selectedSet = computed(() => new Set(parseModels(values.models ?? '')))
 const allFetchedSelected = computed(
   () => fetchedModels.value.length > 0 && fetchedModels.value.every((m) => selectedSet.value.has(m)),
 )
 
 function toggleModel(m: string): void {
-  const set = new Set(parseModels(form.models))
+  const set = new Set(parseModels(values.models ?? ''))
   if (set.has(m)) set.delete(m)
   else set.add(m)
-  form.models = Array.from(set).join(',')
+  setFieldValue('models', Array.from(set).join(','))
 }
 
 function toggleSelectAll(): void {
-  const set = new Set(parseModels(form.models))
-  if (allFetchedSelected.value) {
-    fetchedModels.value.forEach((m) => set.delete(m))
-  } else {
-    fetchedModels.value.forEach((m) => set.add(m))
-  }
-  form.models = Array.from(set).join(',')
+  const set = new Set(parseModels(values.models ?? ''))
+  if (allFetchedSelected.value) fetchedModels.value.forEach((m) => set.delete(m))
+  else fetchedModels.value.forEach((m) => set.add(m))
+  setFieldValue('models', Array.from(set).join(','))
 }
 
 async function doFetchModels(): Promise<void> {
-  if (!form.baseUrl.trim()) {
+  if (!values.baseUrl?.trim()) {
     toast.error('请先填写上游地址')
     return
   }
-  if (!editingId.value && !form.apiKey.trim()) {
+  if (!editingId.value && !values.apiKey?.trim()) {
     toast.error('请先填写上游密钥')
     return
   }
   fetchingModels.value = true
   try {
     const models = await fetchChannelModels({
-      baseUrl: form.baseUrl.trim(),
-      apiKey: form.apiKey.trim() || undefined,
+      baseUrl: values.baseUrl.trim(),
+      apiKey: values.apiKey?.trim() || undefined,
       id: editingId.value ?? undefined,
     })
     fetchedModels.value = models
@@ -123,61 +208,44 @@ function goPage(p: number): void {
 
 function openCreate(): void {
   editingId.value = null
+  channelType.value = 'openai'
   fetchedModels.value = []
-  Object.assign(form, {
-    name: '',
-    type: 'openai',
-    baseUrl: '',
-    apiKey: '',
-    models: '',
-    group: 'default',
-    modelMapping: '',
-    weight: 1,
-    priority: 0,
-    status: 1,
-  })
+  resetForm({ values: { ...defaults } })
   showForm.value = true
 }
 
 function openEdit(c: Channel): void {
   editingId.value = c.id
+  channelType.value = c.type
   fetchedModels.value = []
-  Object.assign(form, {
-    name: c.name,
-    type: c.type,
-    baseUrl: c.baseUrl,
-    apiKey: '',
-    models: c.models,
-    group: c.group,
-    modelMapping: c.modelMapping ?? '',
-    weight: c.weight,
-    priority: c.priority,
-    status: c.status,
+  resetForm({
+    values: {
+      name: c.name,
+      baseUrl: c.baseUrl,
+      apiKey: '',
+      models: c.models,
+      group: c.group,
+      modelMapping: c.modelMapping ?? '',
+      weight: c.weight,
+      priority: c.priority,
+      status: String(c.status),
+    },
   })
   showForm.value = true
 }
 
-async function submit(): Promise<void> {
-  if (!form.name.trim() || !form.baseUrl.trim() || !form.models.trim()) {
-    toast.error('请填写名称、上游地址与支持的模型')
-    return
-  }
-  if (!editingId.value && !form.apiKey.trim()) {
-    toast.error('请填写上游密钥')
-    return
-  }
-  saving.value = true
+const submit = handleSubmit(async (v) => {
   const payload: ChannelRequest = {
-    name: form.name.trim(),
-    type: form.type,
-    baseUrl: form.baseUrl.trim(),
-    apiKey: form.apiKey.trim(),
-    models: form.models.trim(),
-    group: form.group.trim() || 'default',
-    modelMapping: form.modelMapping?.trim() || undefined,
-    weight: Number(form.weight) || 1,
-    priority: Number(form.priority) || 0,
-    status: form.status,
+    name: v.name.trim(),
+    type: channelType.value,
+    baseUrl: v.baseUrl.trim(),
+    apiKey: (v.apiKey ?? '').trim(),
+    models: v.models.trim(),
+    group: v.group?.trim() || 'default',
+    modelMapping: v.modelMapping?.trim() || undefined,
+    weight: Number(v.weight) || 1,
+    priority: Number(v.priority) || 0,
+    status: Number(v.status),
   }
   try {
     if (editingId.value) {
@@ -191,10 +259,8 @@ async function submit(): Promise<void> {
     await load()
   } catch {
     // 拦截器已提示
-  } finally {
-    saving.value = false
   }
-}
+})
 
 async function toggle(c: Channel): Promise<void> {
   const next = c.status === 1 ? 0 : 1
@@ -207,13 +273,14 @@ async function toggle(c: Channel): Promise<void> {
   }
 }
 
-async function remove(c: Channel): Promise<void> {
-  const ok = await confirmDialog({
-    message: `确定删除渠道「${c.name}」?`,
-    danger: true,
-    confirmText: '删除',
-  })
-  if (!ok) return
+function askDelete(c: Channel): void {
+  deleteTarget.value = c
+  showDelete.value = true
+}
+
+async function confirmDelete(): Promise<void> {
+  const c = deleteTarget.value
+  if (!c) return
   try {
     await deleteChannel(c.id)
     toast.success('已删除')
@@ -229,194 +296,307 @@ onMounted(() => void load())
 
 <template>
   <div>
-    <div class="row spread" style="margin-bottom: 24px; flex-wrap: wrap; gap: 12px">
-      <form class="row gap-8" @submit.prevent="doSearch">
-        <input v-model="search" class="input" style="width: 220px" placeholder="搜索渠道名称" />
-        <button class="btn" type="submit">搜索</button>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <form class="flex items-center gap-2" @submit.prevent="doSearch">
+        <Input v-model="search" class="w-[220px]" placeholder="搜索渠道名称" />
+        <Button variant="outline" type="submit">搜索</Button>
       </form>
-      <button class="btn btn-primary" type="button" @click="openCreate">+ 新建渠道</button>
+      <Button @click="openCreate">+ 新建渠道</Button>
     </div>
 
-    <div class="card">
-      <div v-if="loading" class="state-box"><span class="spinner" /> 加载中…</div>
-      <div v-else-if="list.length === 0" class="state-box">暂无渠道,点击右上角接入上游服务商</div>
-      <div v-else class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>名称</th>
-              <th>类型</th>
-              <th>上游地址</th>
-              <th>支持模型</th>
-              <th>分组</th>
-              <th>权重</th>
-              <th>优先级</th>
-              <th>状态</th>
-              <th class="text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="c in list" :key="c.id">
-              <td>{{ c.name }}</td>
-              <td><span class="badge badge-gray">{{ c.type }}</span></td>
-              <td class="mono faint">{{ c.baseUrl }}</td>
-              <td class="wrap">{{ c.models }}</td>
-              <td class="wrap">{{ c.group }}</td>
-              <td>{{ c.weight }}</td>
-              <td>{{ c.priority }}</td>
-              <td>
-                <span :class="['badge', c.status === 1 ? 'badge-green' : 'badge-gray']">
-                  {{ c.status === 1 ? '启用' : '禁用' }}
-                </span>
-              </td>
-              <td class="text-right nowrap">
-                <button class="btn btn-sm" type="button" @click="toggle(c)">
-                  {{ c.status === 1 ? '禁用' : '启用' }}
-                </button>
-                <button class="btn btn-sm" type="button" @click="openEdit(c)">编辑</button>
-                <button class="btn btn-sm btn-danger" type="button" @click="remove(c)">删除</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <Card class="gap-0 overflow-hidden p-0">
+      <div v-if="loading" class="space-y-3 p-4">
+        <Skeleton v-for="i in 6" :key="i" class="h-12 w-full" />
       </div>
-      <div class="card-pad" style="padding-top: 0">
-        <BasePagination :current="current" :size="size" :total="total" @update:current="goPage" />
+      <div v-else-if="list.length === 0" class="px-4 py-14 text-center text-muted-foreground">
+        暂无渠道,点击右上角接入上游服务商
       </div>
-    </div>
+      <template v-else>
+        <div class="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>名称</TableHead>
+                <TableHead>类型</TableHead>
+                <TableHead>上游地址</TableHead>
+                <TableHead>支持模型</TableHead>
+                <TableHead>分组</TableHead>
+                <TableHead>权重</TableHead>
+                <TableHead>优先级</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead class="text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="c in list" :key="c.id">
+                <TableCell>{{ c.name }}</TableCell>
+                <TableCell><Badge variant="muted">{{ c.type }}</Badge></TableCell>
+                <TableCell class="font-mono text-muted-foreground">{{ c.baseUrl }}</TableCell>
+                <TableCell class="max-w-[320px]">
+                  <div
+                    v-if="parseModels(c.models).length"
+                    class="flex flex-wrap items-center gap-1"
+                    :title="c.models"
+                  >
+                    <Badge
+                      v-for="m in parseModels(c.models).slice(0, 3)"
+                      :key="m"
+                      variant="muted"
+                      class="font-mono text-xs font-normal"
+                    >
+                      {{ m }}
+                    </Badge>
+                    <span v-if="parseModels(c.models).length > 3" class="text-muted-foreground text-xs">
+                      +{{ parseModels(c.models).length - 3 }} 个
+                    </span>
+                  </div>
+                  <span v-else class="text-muted-foreground">—</span>
+                </TableCell>
+                <TableCell class="max-w-[160px] whitespace-normal">{{ c.group }}</TableCell>
+                <TableCell>{{ c.weight }}</TableCell>
+                <TableCell>{{ c.priority }}</TableCell>
+                <TableCell>
+                  <Badge :variant="c.status === 1 ? 'success' : 'muted'">
+                    {{ c.status === 1 ? '启用' : '禁用' }}
+                  </Badge>
+                </TableCell>
+                <TableCell class="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon-sm">
+                        <MoreHorizontalIcon />
+                        <span class="sr-only">操作</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem @click="toggle(c)">
+                        {{ c.status === 1 ? '禁用' : '启用' }}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem @click="openEdit(c)">
+                        编辑
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" @click="askDelete(c)">
+                        删除
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
 
-    <BaseModal :open="showForm" :title="editingId ? '编辑渠道' : '新建渠道'" width="560px" @close="showForm = false">
-      <div class="field">
-        <label class="field-label">渠道名称<span class="req">*</span></label>
-        <input v-model.trim="form.name" class="input" placeholder="如:OpenAI 官方" />
-        <span class="field-hint">渠道按 OpenAI 兼容协议接入上游(/v1/chat/completions)</span>
-      </div>
-      <div class="field">
-        <label class="field-label">上游地址<span class="req">*</span></label>
-        <input v-model.trim="form.baseUrl" class="input" placeholder="https://api.openai.com" />
-        <span class="field-hint">填根地址(不含 /v1),平台转发时自动拼接请求路径</span>
-      </div>
-      <div class="field">
-        <label class="field-label">上游密钥<span v-if="!editingId" class="req">*</span></label>
-        <textarea
-          v-model.trim="form.apiKey"
-          class="textarea"
-          :placeholder="editingId ? '留空则沿用库中原密钥' : 'sk-...'"
-        />
-        <span class="field-hint">
-          {{
-            editingId
-              ? '出于安全后端不返回原密钥;留空则沿用库中原密钥,如需更换或重新获取模型请填写'
-              : '上游服务商的真实密钥;可换行填写多个 key(随机轮换)'
-          }}
-        </span>
-      </div>
-      <div class="field">
-        <label class="field-label">支持的模型<span class="req">*</span></label>
-        <div class="row gap-8" style="margin-bottom: 12px; flex-wrap: wrap">
-          <button class="btn btn-sm" type="button" :disabled="fetchingModels" @click="doFetchModels">
-            <span v-if="fetchingModels" class="spinner" />
-            <span v-else>获取模型</span>
-          </button>
-          <button v-if="fetchedModels.length" class="btn btn-sm" type="button" @click="toggleSelectAll">
-            {{ allFetchedSelected ? '取消全选' : '全选' }}
-          </button>
-          <span v-if="fetchedModels.length" class="field-hint" style="align-self: center; margin: 0">
-            已选 {{ selectedSet.size }} / 获取 {{ fetchedModels.length }}
-          </span>
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+          <span class="text-sm text-muted-foreground">共 {{ total }} 条</span>
+          <Pagination
+            v-slot="{ page }"
+            :page="current"
+            :items-per-page="size"
+            :total="total"
+            :sibling-count="1"
+            show-edges
+            class="mx-0 w-auto"
+            @update:page="goPage"
+          >
+            <PaginationContent v-slot="{ items }">
+              <PaginationPrevious>上一页</PaginationPrevious>
+              <template v-for="(item, idx) in items" :key="idx">
+                <PaginationItem
+                  v-if="item.type === 'page'"
+                  :value="item.value"
+                  :is-active="item.value === page"
+                >
+                  {{ item.value }}
+                </PaginationItem>
+                <PaginationEllipsis v-else :index="idx" />
+              </template>
+              <PaginationNext>下一页</PaginationNext>
+            </PaginationContent>
+          </Pagination>
         </div>
-        <div v-if="fetchedModels.length" class="model-grid">
-          <label v-for="m in fetchedModels" :key="m" class="model-item">
-            <input type="checkbox" :checked="selectedSet.has(m)" @change="toggleModel(m)" />
-            <span class="mono">{{ m }}</span>
-          </label>
-        </div>
-        <textarea
-          v-model.trim="form.models"
-          class="textarea"
-          placeholder="gpt-4o,gpt-4o-mini(可“获取模型”后多选/全选,或在此手动逗号分隔)"
-        />
-        <span class="field-hint">逗号分隔;同一模型多渠道时按优先级取最高,再按权重随机</span>
-      </div>
-      <div class="field">
-        <label class="field-label">分组</label>
-        <input v-model.trim="form.group" class="input" placeholder="default" />
-        <span class="field-hint">逗号分隔可属多组;仅同分组的 API Key 能路由到该渠道</span>
-      </div>
-      <div class="field">
-        <label class="field-label">模型重命名映射</label>
-        <textarea v-model.trim="form.modelMapping" class="textarea" placeholder='{"gpt-4":"gpt-4o"}(可选,JSON)' />
-      </div>
-      <div class="grid3">
-        <div class="field">
-          <label class="field-label">权重</label>
-          <input v-model.number="form.weight" class="input" type="number" min="1" />
-        </div>
-        <div class="field">
-          <label class="field-label">优先级</label>
-          <input v-model.number="form.priority" class="input" type="number" />
-        </div>
-        <div class="field">
-          <label class="field-label">状态</label>
-          <select v-model.number="form.status" class="select">
-            <option :value="1">启用</option>
-            <option :value="0">禁用</option>
-          </select>
-        </div>
-      </div>
-
-      <template #footer>
-        <button class="btn" type="button" @click="showForm = false">取消</button>
-        <button class="btn btn-primary" type="button" :disabled="saving" @click="submit">
-          <span v-if="saving" class="spinner" />
-          <span v-else>保存</span>
-        </button>
       </template>
-    </BaseModal>
+    </Card>
+
+    <Dialog v-model:open="showForm">
+      <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle>{{ editingId ? '编辑渠道' : '新建渠道' }}</DialogTitle>
+        </DialogHeader>
+
+        <form class="space-y-4" @submit="submit">
+          <FormField v-slot="{ componentField }" name="name">
+            <FormItem>
+              <FormLabel>渠道名称</FormLabel>
+              <FormControl><Input v-bind="componentField" placeholder="如:OpenAI 官方" /></FormControl>
+              <FormDescription>渠道按 OpenAI 兼容协议接入上游(/v1/chat/completions)</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="baseUrl">
+            <FormItem>
+              <FormLabel>上游地址</FormLabel>
+              <FormControl>
+                <Input v-bind="componentField" placeholder="https://api.openai.com" />
+              </FormControl>
+              <FormDescription>填根地址(不含 /v1),平台转发时自动拼接请求路径</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="apiKey">
+            <FormItem>
+              <FormLabel>上游密钥</FormLabel>
+              <FormControl>
+                <Textarea
+                  v-bind="componentField"
+                  :placeholder="editingId ? '留空则沿用库中原密钥' : 'sk-...'"
+                />
+              </FormControl>
+              <FormDescription>
+                {{
+                  editingId
+                    ? '出于安全后端不返回原密钥;留空则沿用库中原密钥,如需更换或重新获取模型请填写'
+                    : '上游服务商的真实密钥;可换行填写多个 key(随机轮换)'
+                }}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="models">
+            <FormItem>
+              <FormLabel>支持的模型</FormLabel>
+              <div class="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  :disabled="fetchingModels"
+                  @click="doFetchModels"
+                >
+                  <Spinner v-if="fetchingModels" />
+                  获取模型
+                </Button>
+                <Button
+                  v-if="fetchedModels.length"
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  @click="toggleSelectAll"
+                >
+                  {{ allFetchedSelected ? '取消全选' : '全选' }}
+                </Button>
+                <span v-if="fetchedModels.length" class="text-xs text-muted-foreground">
+                  已选 {{ selectedSet.size }} / 获取 {{ fetchedModels.length }}
+                </span>
+              </div>
+              <div
+                v-if="fetchedModels.length"
+                class="grid max-h-[220px] grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-x-[18px] gap-y-2.5 overflow-y-auto rounded-lg border border-border bg-background p-4"
+              >
+                <label
+                  v-for="m in fetchedModels"
+                  :key="m"
+                  class="text-secondary-foreground flex cursor-pointer items-center gap-2 overflow-hidden text-[13px]"
+                >
+                  <Checkbox
+                    :model-value="selectedSet.has(m)"
+                    @update:model-value="() => toggleModel(m)"
+                  />
+                  <span class="truncate font-mono">{{ m }}</span>
+                </label>
+              </div>
+              <FormControl>
+                <Textarea
+                  v-bind="componentField"
+                  placeholder="gpt-4o,gpt-4o-mini(可“获取模型”后多选/全选,或在此手动逗号分隔)"
+                />
+              </FormControl>
+              <FormDescription>逗号分隔;同一模型多渠道时按优先级取最高,再按权重随机</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="group">
+            <FormItem>
+              <FormLabel>分组</FormLabel>
+              <FormControl><Input v-bind="componentField" placeholder="default" /></FormControl>
+              <FormDescription>逗号分隔可属多组;仅同分组的 API Key 能路由到该渠道</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ componentField }" name="modelMapping">
+            <FormItem>
+              <FormLabel>模型重命名映射</FormLabel>
+              <FormControl>
+                <Textarea v-bind="componentField" placeholder='{"gpt-4":"gpt-4o"}(可选,JSON)' />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <div class="grid grid-cols-3 gap-4 max-[560px]:grid-cols-1">
+            <FormField v-slot="{ componentField }" name="weight">
+              <FormItem>
+                <FormLabel>权重</FormLabel>
+                <FormControl><Input v-bind="componentField" type="number" min="1" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+            <FormField v-slot="{ componentField }" name="priority">
+              <FormItem>
+                <FormLabel>优先级</FormLabel>
+                <FormControl><Input v-bind="componentField" type="number" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+            <FormField v-slot="{ componentField }" name="status">
+              <FormItem>
+                <FormLabel>状态</FormLabel>
+                <Select v-bind="componentField">
+                  <FormControl>
+                    <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="1">启用</SelectItem>
+                    <SelectItem value="0">禁用</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" type="button" @click="showForm = false">取消</Button>
+            <Button type="submit" :disabled="isSubmitting">
+              <Spinner v-if="isSubmitting" />
+              保存
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog v-model:open="showDelete">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>删除渠道</AlertDialogTitle>
+          <AlertDialogDescription>确定删除渠道「{{ deleteTarget?.name }}」?</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-white hover:bg-destructive/90"
+            @click="confirmDelete"
+          >
+            删除
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
-
-<style scoped>
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-.grid3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 18px;
-}
-.model-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 10px 18px;
-  max-height: 220px;
-  overflow-y: auto;
-  padding: 16px;
-  margin-bottom: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-}
-.model-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-text-soft);
-  cursor: pointer;
-  overflow: hidden;
-}
-.model-item .mono {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@media (max-width: 560px) {
-  .grid2,
-  .grid3 {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

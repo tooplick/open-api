@@ -28,4 +28,7 @@ public class User extends BaseEntity {
 
     /** 1启用 0禁用 */
     private Integer status;
+
+    /** 1需在首次登录后强制修改用户名+密码 0否 */
+    private Integer mustChangePassword;
 }

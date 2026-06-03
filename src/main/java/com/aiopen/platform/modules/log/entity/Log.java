@@ -43,6 +43,28 @@ public class Log implements Serializable {
     /** 耗时(毫秒) */
     private Long durationMs;
 
+    /** 上游 HTTP 状态码 */
+    private Integer httpStatus;
+
+    /** 是否流式: 1是 0否 */
+    @TableField("is_stream")
+    private Integer stream;
+
+    /** 映射后实际请求上游的模型名 */
+    private String upstreamModel;
+
+    /** 客户端请求端点路径 */
+    private String endpoint;
+
+    /** 首字延迟(毫秒) */
+    private Long ttfbMs;
+
+    /** 上游耗时(毫秒) */
+    private Long upstreamMs;
+
+    /** 客户端 User-Agent */
+    private String userAgent;
+
     private String requestId;
 
     private String ip;

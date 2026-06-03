@@ -22,6 +22,7 @@ CREATE TABLE `user`
     `email`       VARCHAR(100) DEFAULT NULL COMMENT '邮箱',
     `role`        VARCHAR(20)  NOT NULL DEFAULT 'user' COMMENT '角色: admin / user',
     `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0禁用',
+    `must_change_password` TINYINT NOT NULL DEFAULT 0 COMMENT '1需首次登录强制改账号密码 0否',
     `create_time` DATETIME     DEFAULT NULL COMMENT '创建时间',
     `update_time` DATETIME     DEFAULT NULL COMMENT '更新时间',
     `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0未删 1已删',
@@ -115,9 +116,16 @@ CREATE TABLE `log`
     `completion_tokens` INT          NOT NULL DEFAULT 0 COMMENT '输出 token',
     `total_tokens`      INT          NOT NULL DEFAULT 0 COMMENT '总 token',
     `duration_ms`       BIGINT       NOT NULL DEFAULT 0 COMMENT '耗时(毫秒)',
+    `http_status`       INT          DEFAULT NULL COMMENT '上游 HTTP 状态码',
+    `is_stream`         TINYINT      NOT NULL DEFAULT 0 COMMENT '是否流式: 1是 0否',
+    `upstream_model`    VARCHAR(100) DEFAULT NULL COMMENT '映射后实际请求上游的模型',
+    `endpoint`          VARCHAR(255) DEFAULT NULL COMMENT '客户端请求端点路径',
+    `ttfb_ms`           BIGINT       DEFAULT NULL COMMENT '首字延迟(毫秒)',
+    `upstream_ms`       BIGINT       DEFAULT NULL COMMENT '上游耗时(毫秒)',
+    `user_agent`        VARCHAR(255) DEFAULT NULL COMMENT '客户端 User-Agent',
     `request_id`        VARCHAR(64)  DEFAULT NULL COMMENT '请求ID',
     `ip`                VARCHAR(64)  DEFAULT NULL COMMENT '客户端IP',
-    `content`           VARCHAR(500) DEFAULT NULL COMMENT '摘要/错误信息',
+    `content`           VARCHAR(1000) DEFAULT NULL COMMENT '摘要/错误信息',
     `create_time`       DATETIME     DEFAULT NULL COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
@@ -128,6 +136,22 @@ CREATE TABLE `log`
   DEFAULT CHARSET = utf8mb4 COMMENT ='调用日志表';
 
 -- ---------------------------
+-- 系统设置表(键值;站点信息/注册开关/默认分组/登录公告 等)
+-- ---------------------------
+DROP TABLE IF EXISTS `system_setting`;
+CREATE TABLE `system_setting`
+(
+    `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `config_key`   VARCHAR(100) NOT NULL COMMENT '配置键',
+    `config_value` TEXT         DEFAULT NULL COMMENT '配置值(统一字符串存储)',
+    `update_time`  DATETIME     DEFAULT NULL COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_config_key` (`config_key`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='系统设置表';
+
+-- ---------------------------
 -- 管理员账号由应用启动时自动创建(见 DataInitializer): admin / admin
+-- 系统设置默认项由应用启动时补齐(见 SettingInitializer)
 -- 模型不再手动维护, 由各渠道的 models 字段聚合得到
 -- ---------------------------

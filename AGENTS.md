@@ -39,7 +39,7 @@ npm run build      # 先 vue-tsc 类型检查,再 vite build(类型/未用变量
 
 ## 红线 / 标准决定(细节见 CLAUDE.md)
 
-- **不引入 UI 组件库**(Element Plus / Ant Design Vue 等):前端组件按设计决定**手写**;Pinia / axios / Vue Router 可用。
+- **UI 用 shadcn-vue**(Reka UI + Tailwind v4):组件自持在 `src/components/ui/`,扩展靠 `npx shadcn-vue@latest add <name>` 新增并自持组件,**不要再叠加其他 UI 组件库**(Element Plus / Ant Design Vue 等);Pinia / axios / Vue Router 照常可用。
 - **不加计费 / 配额**:平台只记录用量。
 - **`schema.sql` 是 `DROP` + `CREATE`**:重跑会清库,无迁移脚本;演进既有库请手写 `ALTER`。
 - **Lombok 注解处理是关键配置**:`pom.xml` 中 `maven-compiler-plugin` 的 `annotationProcessorPaths`(Lombok 1.18.38)不可删 —— JDK 23+ 删掉它会让所有 Lombok 生成代码静默失效。

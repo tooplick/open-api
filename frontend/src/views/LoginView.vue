@@ -1,212 +1,217 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { toTypedSchema } from '@vee-validate/zod'
+import * as z from 'zod'
+import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
 import { register as registerApi } from '@/api/auth'
-import { toast } from '@/composables/useToast'
+import { getPublicSettings } from '@/api/setting'
+import type { PublicSettings } from '@/types'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const mode = ref<'login' | 'register'>('login')
-const loading = ref(false)
+const tab = ref('login')
+const loginInitial = ref({ username: '', password: '' })
 
-const loginForm = reactive({ username: '', password: '' })
-const regForm = reactive({ username: '', password: '', email: '' })
+const pub = reactive<PublicSettings>({
+  siteName: 'AI Open Platform',
+  siteSubtitle: '大模型聚合开放平台 · 控制台',
+  loginAnnouncement: '',
+  defaultKeyGroup: 'default',
+  registerEnabled: true,
+  passwordRegisterEnabled: true,
+  emailRegisterEnabled: false,
+  githubRegisterEnabled: false,
+})
 
-async function doLogin(): Promise<void> {
-  if (!loginForm.username || !loginForm.password) {
-    toast.error('请输入用户名和密码')
-    return
-  }
-  loading.value = true
+const showRegister = computed(() => pub.registerEnabled && pub.passwordRegisterEnabled)
+
+onMounted(async () => {
   try {
-    await auth.login(loginForm.username, loginForm.password)
+    Object.assign(pub, await getPublicSettings())
+    if (pub.siteName) document.title = pub.siteName
+  }
+  catch {
+    // 设置接口不可用时使用默认值,登录仍可用
+  }
+})
+
+const loginSchema = toTypedSchema(
+  z.object({
+    username: z.string().min(1, '请输入用户名'),
+    password: z.string().min(1, '请输入密码'),
+  }),
+)
+const registerSchema = toTypedSchema(
+  z.object({
+    username: z.string().min(3, '用户名 3-50 位').max(50, '用户名 3-50 位'),
+    password: z.string().min(6, '密码 6-50 位').max(50, '密码 6-50 位'),
+    email: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
+  }),
+)
+
+async function onLogin(values: any): Promise<void> {
+  try {
+    await auth.login(values.username, values.password)
     toast.success('登录成功')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     await router.replace(redirect || { name: 'dashboard' })
-  } catch {
+  }
+  catch {
     // 错误提示已由 axios 拦截器统一弹出
-  } finally {
-    loading.value = false
   }
 }
 
-async function doRegister(): Promise<void> {
-  if (!regForm.username || !regForm.password) {
-    toast.error('请输入用户名和密码')
-    return
-  }
-  loading.value = true
+async function onRegister(values: any): Promise<void> {
   try {
     await registerApi({
-      username: regForm.username,
-      password: regForm.password,
-      email: regForm.email || undefined,
+      username: values.username,
+      password: values.password,
+      email: values.email || undefined,
     })
     toast.success('注册成功,请登录')
-    loginForm.username = regForm.username
-    loginForm.password = ''
-    regForm.password = ''
-    mode.value = 'login'
-  } catch {
+    loginInitial.value = { username: values.username, password: '' }
+    tab.value = 'login'
+  }
+  catch {
     // 同上
-  } finally {
-    loading.value = false
   }
 }
 </script>
 
 <template>
-  <div class="auth">
-    <div class="auth-card card">
-      <div class="auth-brand">
-        <span class="auth-mark">AI</span>
-        <div>
-          <div class="auth-name">AI Open Platform</div>
-          <div class="auth-sub muted">大模型聚合开放平台 · 控制台</div>
+  <div
+    class="app-auth-bg flex min-h-screen items-center justify-center p-6"
+  >
+    <Card class="w-full max-w-[420px] shadow-lg">
+      <CardHeader>
+        <div class="mb-1 flex items-center gap-3">
+          <span
+            class="bg-primary text-primary-foreground flex size-11 items-center justify-center rounded-2xl text-base font-bold"
+          >AI</span>
+          <div>
+            <CardTitle class="text-lg">
+              {{ pub.siteName }}
+            </CardTitle>
+            <CardDescription>{{ pub.siteSubtitle }}</CardDescription>
+          </div>
         </div>
-      </div>
-
-      <div class="auth-tabs">
-        <button :class="['auth-tab', { active: mode === 'login' }]" type="button" @click="mode = 'login'">
-          登录
-        </button>
-        <button
-          :class="['auth-tab', { active: mode === 'register' }]"
-          type="button"
-          @click="mode = 'register'"
+      </CardHeader>
+      <CardContent>
+        <div
+          v-if="pub.loginAnnouncement"
+          class="bg-muted text-muted-foreground mb-5 rounded-lg border px-3.5 py-2.5 text-sm whitespace-pre-line"
         >
-          注册
-        </button>
-      </div>
+          {{ pub.loginAnnouncement }}
+        </div>
+        <Tabs v-model="tab">
+          <TabsList v-if="showRegister" class="mb-5 grid w-full grid-cols-2">
+            <TabsTrigger value="login">
+              登录
+            </TabsTrigger>
+            <TabsTrigger value="register">
+              注册
+            </TabsTrigger>
+          </TabsList>
 
-      <form v-if="mode === 'login'" @submit.prevent="doLogin">
-        <div class="field">
-          <label class="field-label">用户名</label>
-          <input v-model.trim="loginForm.username" class="input" placeholder="请输入用户名" autocomplete="username" />
-        </div>
-        <div class="field">
-          <label class="field-label">密码</label>
-          <input
-            v-model="loginForm.password"
-            class="input"
-            type="password"
-            placeholder="请输入密码"
-            autocomplete="current-password"
-          />
-        </div>
-        <button class="btn btn-primary btn-block" type="submit" :disabled="loading">
-          <span v-if="loading" class="spinner" />
-          <span v-else>登录</span>
-        </button>
-      </form>
+          <TabsContent value="login">
+            <Form
+              v-slot="{ isSubmitting }"
+              :initial-values="loginInitial"
+              :validation-schema="loginSchema"
+              class="space-y-4"
+              @submit="onLogin"
+            >
+              <FormField v-slot="{ componentField }" name="username">
+                <FormItem>
+                  <FormLabel>用户名</FormLabel>
+                  <FormControl>
+                    <Input v-bind="componentField" placeholder="请输入用户名" autocomplete="username" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+              <FormField v-slot="{ componentField }" name="password">
+                <FormItem>
+                  <FormLabel>密码</FormLabel>
+                  <FormControl>
+                    <Input
+                      v-bind="componentField"
+                      type="password"
+                      placeholder="请输入密码"
+                      autocomplete="current-password"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+              <Button type="submit" class="w-full" :disabled="isSubmitting">
+                <Spinner v-if="isSubmitting" />
+                登录
+              </Button>
+            </Form>
+          </TabsContent>
 
-      <form v-else @submit.prevent="doRegister">
-        <div class="field">
-          <label class="field-label">用户名<span class="req">*</span></label>
-          <input v-model.trim="regForm.username" class="input" placeholder="3-50 位" autocomplete="username" />
-        </div>
-        <div class="field">
-          <label class="field-label">密码<span class="req">*</span></label>
-          <input
-            v-model="regForm.password"
-            class="input"
-            type="password"
-            placeholder="6-50 位"
-            autocomplete="new-password"
-          />
-        </div>
-        <div class="field">
-          <label class="field-label">邮箱</label>
-          <input v-model.trim="regForm.email" class="input" type="email" placeholder="可选" autocomplete="email" />
-        </div>
-        <button class="btn btn-primary btn-block" type="submit" :disabled="loading">
-          <span v-if="loading" class="spinner" />
-          <span v-else>注册</span>
-        </button>
-      </form>
+          <TabsContent v-if="showRegister" value="register">
+            <Form
+              v-slot="{ isSubmitting }"
+              :validation-schema="registerSchema"
+              class="space-y-4"
+              @submit="onRegister"
+            >
+              <FormField v-slot="{ componentField }" name="username">
+                <FormItem>
+                  <FormLabel>用户名</FormLabel>
+                  <FormControl>
+                    <Input v-bind="componentField" placeholder="3-50 位" autocomplete="username" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+              <FormField v-slot="{ componentField }" name="password">
+                <FormItem>
+                  <FormLabel>密码</FormLabel>
+                  <FormControl>
+                    <Input
+                      v-bind="componentField"
+                      type="password"
+                      placeholder="6-50 位"
+                      autocomplete="new-password"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+              <FormField v-slot="{ componentField }" name="email">
+                <FormItem>
+                  <FormLabel>邮箱</FormLabel>
+                  <FormControl>
+                    <Input v-bind="componentField" type="email" placeholder="可选" autocomplete="email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+              <Button type="submit" class="w-full" :disabled="isSubmitting">
+                <Spinner v-if="isSubmitting" />
+                注册
+              </Button>
+            </Form>
+          </TabsContent>
+        </Tabs>
 
-      <p class="auth-tip muted">默认管理员:admin / admin(首次启动自动创建)</p>
-    </div>
+        <p class="text-muted-foreground mt-5 text-center text-xs">
+          默认管理员:admin / admin(首次启动自动创建)
+        </p>
+      </CardContent>
+    </Card>
   </div>
 </template>
-
-<style scoped>
-.auth {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: linear-gradient(160deg, #fbf9f8 0%, #eae7e7 55%, #e1e2e8 100%);
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 400px;
-  padding: 32px;
-  box-shadow: var(--shadow-lg);
-}
-
-.auth-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.auth-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius);
-  background: var(--color-primary);
-  color: #fff;
-  font-weight: 700;
-  font-size: 16px;
-}
-
-.auth-name {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.auth-sub {
-  font-size: 12px;
-}
-
-.auth-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.auth-tab {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  background: transparent;
-  font-size: 15px;
-  color: var(--color-text-soft);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-
-.auth-tab.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-  font-weight: 500;
-}
-
-.auth-tip {
-  margin-top: 18px;
-  font-size: 12px;
-  text-align: center;
-}
-</style>

@@ -2,6 +2,7 @@ package com.aiopen.platform.modules.user.service.impl;
 
 import com.aiopen.platform.common.exception.BusinessException;
 import com.aiopen.platform.common.result.ResultCode;
+import com.aiopen.platform.modules.setting.service.SystemSettingService;
 import com.aiopen.platform.modules.user.dto.ChangePasswordRequest;
 import com.aiopen.platform.modules.user.dto.RegisterRequest;
 import com.aiopen.platform.modules.user.entity.User;
@@ -19,9 +20,13 @@ import org.springframework.stereotype.Service;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     private final PasswordEncoder passwordEncoder;
+    private final SystemSettingService settingService;
 
     @Override
     public User register(RegisterRequest request) {
+        if (!settingService.isRegisterEnabled() || !settingService.isPasswordRegisterEnabled()) {
+            throw new BusinessException(ResultCode.REGISTER_DISABLED);
+        }
         if (getByUsername(request.getUsername()) != null) {
             throw new BusinessException(ResultCode.USERNAME_EXISTS);
         }

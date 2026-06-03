@@ -22,6 +22,7 @@ public enum ResultCode {
     PASSWORD_ERROR(1003, "用户名或密码错误"),
     ACCOUNT_DISABLED(1004, "账号已被禁用"),
     OLD_PASSWORD_ERROR(1005, "原密码不正确"),
+    REGISTER_DISABLED(1006, "当前未开放该注册方式"),
 
     // 额度相关 11xx
     QUOTA_INSUFFICIENT(1101, "额度不足"),

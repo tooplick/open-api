@@ -3,7 +3,7 @@
 聚合多家大模型服务商,对外提供**统一的 OpenAI 兼容接口**的开放平台网关。一次接入,即可用标准 OpenAI / Anthropic 协议调用背后任意渠道。
 
 - 后端:Spring Boot 3 + MyBatis-Plus + MySQL 8
-- 前端控制台:Vue 3 + Vite + TypeScript(组件手写,未引入 UI 组件库)
+- 前端控制台:Vue 3 + Vite + TypeScript,UI 基于 shadcn-vue(Reka UI + Tailwind v4)
 
 ## 特性
 
@@ -44,7 +44,7 @@ docker compose up -d --build
 | 数据库 | MySQL 8 |
 | 鉴权 | Spring Security 6 + JWT(jjwt)+ BCrypt |
 | 转发 | JDK `java.net.http.HttpClient`(支持 SSE 流式) |
-| 前端 | Vue 3、Vite、TypeScript、Pinia、Vue Router、axios |
+| 前端 | Vue 3、Vite、TypeScript、Pinia、Vue Router、axios、shadcn-vue(Reka UI + Tailwind v4) |
 
 ## 许可证
 

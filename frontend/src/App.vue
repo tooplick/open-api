@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import ToastHost from '@/components/ToastHost.vue'
-import ConfirmHost from '@/components/ConfirmHost.vue'
+import { Toaster } from '@/components/ui/sonner'
 </script>
 
 <template>
   <RouterView />
-  <ToastHost />
-  <ConfirmHost />
+  <Toaster position="top-right" rich-colors />
 </template>

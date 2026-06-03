@@ -95,24 +95,30 @@ public class RelayService {
         byte[] upstreamBody = adaptor.convertRequest(root, upstreamModel, stream);
 
         Usage usage = new Usage();
-        int status;
+        RelayMetrics metrics = new RelayMetrics();
+        long upstreamStart = System.currentTimeMillis();
         try {
-            status = stream
-                    ? forwardStreaming(adaptor, url, upstreamKey, upstreamBody, response, usage)
-                    : forwardBlocking(adaptor, url, upstreamKey, upstreamBody, response, usage);
+            if (stream) {
+                forwardStreaming(adaptor, url, upstreamKey, upstreamBody, response, usage, metrics, upstreamStart);
+            } else {
+                forwardBlocking(adaptor, url, upstreamKey, upstreamBody, response, usage, metrics, upstreamStart);
+            }
         } catch (Exception e) {
+            metrics.upstreamMs = System.currentTimeMillis() - upstreamStart;
             log.error("转发上游失败 channel={} url={}: {}", channel.getName(), url, e.getMessage());
-            recordLog(ctx, channel, model, 2, usage, System.currentTimeMillis() - start, request,
-                    "上游请求异常: " + e.getMessage());
+            recordLog(ctx, channel, model, upstreamModel, stream, 2, usage,
+                    System.currentTimeMillis() - start, request, metrics, "上游请求异常: " + e.getMessage());
             if (!response.isCommitted()) {
                 throw new RelayException(502, "upstream_error", "上游渠道请求失败");
             }
             return;
         }
+        metrics.upstreamMs = System.currentTimeMillis() - upstreamStart;
 
-        boolean success = status >= 200 && status < 300;
-        recordLog(ctx, channel, model, success ? 1 : 2, usage,
-                System.currentTimeMillis() - start, request, success ? null : "上游返回状态 " + status);
+        boolean success = metrics.status >= 200 && metrics.status < 300;
+        recordLog(ctx, channel, model, upstreamModel, stream, success ? 1 : 2, usage,
+                System.currentTimeMillis() - start, request, metrics,
+                success ? null : "上游返回状态 " + metrics.status);
     }
 
     private boolean modelAllowed(String modelLimits, String model) {
@@ -163,8 +169,9 @@ public class RelayService {
         return keys.get(ThreadLocalRandom.current().nextInt(keys.size()));
     }
 
-    private int forwardBlocking(UpstreamAdaptor adaptor, String url, String upstreamKey, byte[] upstreamBody,
-                                HttpServletResponse response, Usage usage) throws IOException {
+    private void forwardBlocking(UpstreamAdaptor adaptor, String url, String upstreamKey, byte[] upstreamBody,
+                                 HttpServletResponse response, Usage usage, RelayMetrics metrics, long upstreamStart)
+            throws IOException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
@@ -172,7 +179,9 @@ public class RelayService {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(upstreamBody));
         adaptor.applyAuthHeaders(builder, upstreamKey);
         HttpResponse<byte[]> resp = send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
+        metrics.ttfbMs = System.currentTimeMillis() - upstreamStart;
         int code = resp.statusCode();
+        metrics.status = code;
         byte[] clientBody = (code >= 200 && code < 300)
                 ? adaptor.convertResponse(resp.body(), usage)
                 : resp.body();
@@ -181,11 +190,11 @@ public class RelayService {
         OutputStream os = response.getOutputStream();
         os.write(clientBody);
         os.flush();
-        return code;
     }
 
-    private int forwardStreaming(UpstreamAdaptor adaptor, String url, String upstreamKey, byte[] upstreamBody,
-                                 HttpServletResponse response, Usage usage) throws IOException {
+    private void forwardStreaming(UpstreamAdaptor adaptor, String url, String upstreamKey, byte[] upstreamBody,
+                                  HttpServletResponse response, Usage usage, RelayMetrics metrics, long upstreamStart)
+            throws IOException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
@@ -194,6 +203,7 @@ public class RelayService {
         adaptor.applyAuthHeaders(builder, upstreamKey);
         HttpResponse<InputStream> resp = send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
         int code = resp.statusCode();
+        metrics.status = code;
         response.setStatus(code);
         if (code >= 200 && code < 300) {
             response.setContentType("text/event-stream;charset=utf-8");
@@ -203,7 +213,12 @@ public class RelayService {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
                 PrintWriter writer = response.getWriter();
                 String line;
+                boolean first = true;
                 while ((line = reader.readLine()) != null) {
+                    if (first) {
+                        metrics.ttfbMs = System.currentTimeMillis() - upstreamStart;
+                        first = false;
+                    }
                     String out = adaptor.convertStreamLine(line, usage, state);
                     if (out != null) {
                         writer.write(out);
@@ -212,13 +227,13 @@ public class RelayService {
                 }
             }
         } else {
+            metrics.ttfbMs = System.currentTimeMillis() - upstreamStart;
             byte[] err = StreamUtils.copyToByteArray(resp.body());
             response.setContentType("application/json;charset=utf-8");
             OutputStream os = response.getOutputStream();
             os.write(err);
             os.flush();
         }
-        return code;
     }
 
     private <T> HttpResponse<T> send(HttpRequest req, HttpResponse.BodyHandler<T> handler) throws IOException {
@@ -230,8 +245,9 @@ public class RelayService {
         }
     }
 
-    private void recordLog(RelayContext ctx, Channel channel, String model, int type, Usage usage,
-                           long durationMs, HttpServletRequest request, String content) {
+    private void recordLog(RelayContext ctx, Channel channel, String model, String upstreamModel, boolean stream,
+                           int type, Usage usage, long durationMs, HttpServletRequest request,
+                           RelayMetrics metrics, String content) {
         try {
             Log logEntry = new Log();
             logEntry.setUserId(ctx.getUser().getId());
@@ -240,18 +256,34 @@ public class RelayService {
             logEntry.setChannelId(channel.getId());
             logEntry.setChannelName(channel.getName());
             logEntry.setModelName(model);
+            logEntry.setUpstreamModel(upstreamModel);
+            logEntry.setStream(stream ? 1 : 0);
+            logEntry.setEndpoint(request.getRequestURI());
+            logEntry.setUserAgent(truncate(request.getHeader("User-Agent"), 255));
             logEntry.setType(type);
             logEntry.setPromptTokens(usage.promptTokens);
             logEntry.setCompletionTokens(usage.completionTokens);
             logEntry.setTotalTokens(usage.totalTokens);
             logEntry.setDurationMs(durationMs);
+            if (metrics != null) {
+                logEntry.setHttpStatus(metrics.status);
+                logEntry.setTtfbMs(metrics.ttfbMs);
+                logEntry.setUpstreamMs(metrics.upstreamMs);
+            }
             logEntry.setRequestId(UUID.randomUUID().toString());
             logEntry.setIp(getClientIp(request));
-            logEntry.setContent(content);
+            logEntry.setContent(truncate(content, 1000));
             logService.record(logEntry);
         } catch (Exception e) {
             log.warn("写调用日志失败: {}", e.getMessage());
         }
+    }
+
+    private String truncate(String s, int max) {
+        if (s == null) {
+            return null;
+        }
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private String getClientIp(HttpServletRequest request) {

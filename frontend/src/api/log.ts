@@ -1,5 +1,5 @@
 import { get } from './http'
-import type { LogItem, LogStat, PageResult } from '@/types'
+import type { DailyStat, LogItem, LogStat, PageResult } from '@/types'
 
 export interface LogPageParams {
   current: number
@@ -18,4 +18,8 @@ export function pageLogs(params: LogPageParams) {
 
 export function logStatistics(params: { userId?: number; startTime?: string; endTime?: string }) {
   return get<LogStat>('/api/logs/statistics', params)
+}
+
+export function dailyLogStatistics(params: { userId?: number; startTime?: string; endTime?: string }) {
+  return get<DailyStat[]>('/api/logs/daily', params)
 }

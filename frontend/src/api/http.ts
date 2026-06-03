@@ -4,7 +4,7 @@ import type { Result } from '@/types'
 import { TOKEN_KEY } from '@/utils/constants'
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
-import { toast } from '@/composables/useToast'
+import { toast } from 'vue-sonner'
 
 export class ApiError extends Error {
   code: number

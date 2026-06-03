@@ -29,6 +29,8 @@ export interface User {
   role: string
   /** 1 启用 0 禁用 */
   status: number
+  /** 1 需首次登录强制改账号密码 */
+  mustChangePassword?: number
   createTime?: string
   updateTime?: string
 }
@@ -138,6 +140,20 @@ export interface LogItem {
   completionTokens: number
   totalTokens: number
   durationMs: number
+  /** 上游 HTTP 状态码 */
+  httpStatus?: number | null
+  /** 是否流式: 1 是 0 否 */
+  stream?: number | null
+  /** 映射后实际请求上游的模型 */
+  upstreamModel?: string | null
+  /** 客户端请求端点路径 */
+  endpoint?: string | null
+  /** 首字延迟(毫秒) */
+  ttfbMs?: number | null
+  /** 上游耗时(毫秒) */
+  upstreamMs?: number | null
+  /** 客户端 User-Agent */
+  userAgent?: string | null
   requestId?: string
   ip?: string
   content?: string
@@ -149,4 +165,37 @@ export interface LogStat {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+}
+
+/** 按天聚合用量(趋势图用) */
+export interface DailyStat {
+  date: string
+  requests: number
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+// ---------- 系统设置 ----------
+export interface Settings {
+  siteName: string
+  siteSubtitle: string
+  siteFooter: string
+  loginAnnouncement: string
+  defaultKeyGroup: string
+  registerEnabled: boolean
+  passwordRegisterEnabled: boolean
+  emailRegisterEnabled: boolean
+  githubRegisterEnabled: boolean
+}
+
+export interface PublicSettings {
+  siteName: string
+  siteSubtitle: string
+  loginAnnouncement: string
+  defaultKeyGroup: string
+  registerEnabled: boolean
+  passwordRegisterEnabled: boolean
+  emailRegisterEnabled: boolean
+  githubRegisterEnabled: boolean
 }
