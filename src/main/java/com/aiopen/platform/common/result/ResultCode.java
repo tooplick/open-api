@@ -23,6 +23,11 @@ public enum ResultCode {
     ACCOUNT_DISABLED(1004, "账号已被禁用"),
     OLD_PASSWORD_ERROR(1005, "原密码不正确"),
     REGISTER_DISABLED(1006, "当前未开放该注册方式"),
+    EMAIL_EXISTS(1007, "该邮箱已被注册"),
+    EMAIL_CODE_INVALID(1008, "验证码错误或已过期"),
+    EMAIL_CODE_TOO_FREQUENT(1009, "验证码发送过于频繁，请稍后再试"),
+    EMAIL_SERVICE_NOT_CONFIGURED(1010, "邮件服务未配置，请联系管理员"),
+    EMAIL_SEND_FAILED(1011, "邮件发送失败，请稍后重试"),
 
     // 额度相关 11xx
     QUOTA_INSUFFICIENT(1101, "额度不足"),

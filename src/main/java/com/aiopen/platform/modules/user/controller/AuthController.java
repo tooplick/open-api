@@ -1,9 +1,11 @@
 package com.aiopen.platform.modules.user.controller;
 
 import com.aiopen.platform.common.result.Result;
+import com.aiopen.platform.modules.user.dto.EmailRegisterRequest;
 import com.aiopen.platform.modules.user.dto.LoginRequest;
 import com.aiopen.platform.modules.user.dto.LoginResponse;
 import com.aiopen.platform.modules.user.dto.RegisterRequest;
+import com.aiopen.platform.modules.user.dto.SendEmailCodeRequest;
 import com.aiopen.platform.modules.user.entity.User;
 import com.aiopen.platform.modules.user.service.AuthService;
 import com.aiopen.platform.modules.user.service.UserService;
@@ -25,6 +27,17 @@ public class AuthController {
     @PostMapping("/register")
     public Result<User> register(@Valid @RequestBody RegisterRequest request) {
         return Result.success(userService.register(request));
+    }
+
+    @PostMapping("/email-code")
+    public Result<Void> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request) {
+        userService.sendRegisterEmailCode(request.getEmail());
+        return Result.success();
+    }
+
+    @PostMapping("/email-register")
+    public Result<User> emailRegister(@Valid @RequestBody EmailRegisterRequest request) {
+        return Result.success(userService.emailRegister(request));
     }
 
     @PostMapping("/login")

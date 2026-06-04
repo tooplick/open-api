@@ -46,6 +46,17 @@ export interface RegisterRequest {
   email?: string
 }
 
+export interface SendEmailCodeRequest {
+  email: string
+}
+
+export interface EmailRegisterRequest {
+  username: string
+  password: string
+  email: string
+  code: string
+}
+
 export interface LoginResponse {
   token: string
   user: User
@@ -187,6 +198,12 @@ export interface Settings {
   passwordRegisterEnabled: boolean
   emailRegisterEnabled: boolean
   githubRegisterEnabled: boolean
+  smtpHost: string
+  smtpPort: number
+  smtpUsername: string
+  smtpPassword: string
+  smtpFrom: string
+  smtpSslEnabled: boolean
 }
 
 export interface PublicSettings {

@@ -56,7 +56,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register",
+                                "/api/auth/email-code", "/api/auth/email-register").permitAll()
                         .requestMatchers("/api/settings/public").permitAll()
                         .requestMatchers("/v1/**", "/anthropic/**").permitAll()
                         .requestMatchers("/api/**").authenticated()

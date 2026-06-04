@@ -25,6 +25,12 @@ const form = reactive<Settings>({
   passwordRegisterEnabled: true,
   emailRegisterEnabled: false,
   githubRegisterEnabled: false,
+  smtpHost: '',
+  smtpPort: 587,
+  smtpUsername: '',
+  smtpPassword: '',
+  smtpFrom: '',
+  smtpSslEnabled: false,
 })
 
 async function load(): Promise<void> {
@@ -154,7 +160,7 @@ onMounted(() => void load())
                 邮箱验证码注册
               </div>
               <div class="text-muted-foreground text-xs">
-                需配置 SMTP,具体实现见后续版本
+                需先在下方配置 SMTP 邮件服务
               </div>
             </div>
             <Switch v-model="form.emailRegisterEnabled" :disabled="!form.registerEnabled" />
@@ -169,6 +175,51 @@ onMounted(() => void load())
               </div>
             </div>
             <Switch v-model="form.githubRegisterEnabled" :disabled="!form.registerEnabled" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>SMTP 邮件服务</CardTitle>
+          <CardDescription>用于邮箱验证码注册;密码仅保存、不回显</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div class="space-y-1.5">
+            <Label>SMTP 服务器</Label>
+            <Input v-model="form.smtpHost" placeholder="如 smtp.qq.com" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>端口</Label>
+            <Input v-model.number="form.smtpPort" type="number" placeholder="587" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>账号</Label>
+            <Input v-model="form.smtpUsername" placeholder="发信邮箱账号" autocomplete="off" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>密码 / 授权码</Label>
+            <Input
+              v-model="form.smtpPassword"
+              type="password"
+              placeholder="留空表示不修改"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <Label>发件人</Label>
+            <Input v-model="form.smtpFrom" placeholder="留空则用账号地址" />
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <div>
+              <div class="text-sm font-medium">
+                使用 SSL
+              </div>
+              <div class="text-muted-foreground text-xs">
+                开启 = 465 隐式 SSL;关闭 = 587 STARTTLS
+              </div>
+            </div>
+            <Switch v-model="form.smtpSslEnabled" />
           </div>
         </CardContent>
       </Card>

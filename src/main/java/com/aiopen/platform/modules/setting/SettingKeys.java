@@ -22,4 +22,13 @@ public final class SettingKeys {
     public static final String REGISTER_EMAIL = "register.email.enabled";
     /** GitHub OAuth 注册(实现见后续阶段) */
     public static final String REGISTER_GITHUB = "register.github.enabled";
+
+    // SMTP 邮件服务(邮箱验证码注册用)
+    public static final String SMTP_HOST = "smtp.host";
+    public static final String SMTP_PORT = "smtp.port";
+    public static final String SMTP_USERNAME = "smtp.username";
+    public static final String SMTP_PASSWORD = "smtp.password";
+    public static final String SMTP_FROM = "smtp.from";
+    /** true=465 隐式 SSL;false=587 STARTTLS */
+    public static final String SMTP_SSL_ENABLED = "smtp.ssl.enabled";
 }

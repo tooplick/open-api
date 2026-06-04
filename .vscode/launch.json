@@ -1,6 +1,7 @@
 {
   "version": "0.2.0",
   "configurations": [
+    
     {
       // 调试启动后端(需本地可达的 MySQL;也可只用 Docker 起一个 MySQL 给本地后端连)
       "type": "java",

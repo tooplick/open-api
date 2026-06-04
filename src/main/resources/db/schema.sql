@@ -27,7 +27,8 @@ CREATE TABLE `user`
     `update_time` DATETIME     DEFAULT NULL COMMENT '更新时间',
     `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0未删 1已删',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_username` (`username`)
+    UNIQUE KEY `uk_username` (`username`),
+    KEY `idx_email` (`email`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='用户表';
 
@@ -154,4 +155,11 @@ CREATE TABLE `system_setting`
 -- 管理员账号由应用启动时自动创建(见 DataInitializer): admin / admin
 -- 系统设置默认项由应用启动时补齐(见 SettingInitializer)
 -- 模型不再手动维护, 由各渠道的 models 字段聚合得到
+-- ---------------------------
+
+-- ---------------------------
+-- 老库升级说明(本仓库无迁移脚本;schema.sql 为 DROP+CREATE 全量脚本,老库切勿重跑整脚本以免丢数据)
+-- 邮箱验证码注册:为 user.email 增加普通索引以加速查重(全新库已含,老库仅执行下面一行):
+--   ALTER TABLE `user` ADD KEY `idx_email` (`email`);
+-- SMTP 邮件服务配置走 system_setting 键值表, 由 SettingInitializer 启动补默认项, 无需建表/改表
 -- ---------------------------

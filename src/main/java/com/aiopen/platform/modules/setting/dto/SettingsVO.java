@@ -18,4 +18,12 @@ public class SettingsVO {
     private boolean passwordRegisterEnabled;
     private boolean emailRegisterEnabled;
     private boolean githubRegisterEnabled;
+
+    // SMTP 邮件服务;密码读取时掩码回显,保存时留空或为掩码则保留原值
+    private String smtpHost;
+    private Integer smtpPort;
+    private String smtpUsername;
+    private String smtpPassword;
+    private String smtpFrom;
+    private boolean smtpSslEnabled;
 }
