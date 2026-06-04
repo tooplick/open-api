@@ -13,7 +13,7 @@
 
 ### 控制台接口(`/api/**`)
 
-- **鉴权**:先登录拿 JWT,后续请求带 `Authorization: Bearer <jwt>`;仅 `/api/auth/login`、`/api/auth/register` 公开。登录由 Spring Security 的 `AuthenticationManager` 认证,管理员接口用方法级 `@PreAuthorize("hasRole('ADMIN')")` 鉴权。
+- **鉴权**:先登录拿 JWT,后续请求带 `Authorization: Bearer <jwt>`;仅 `/api/auth/login`、`/api/auth/register`、`/api/auth/email-code`、`/api/auth/email-register` 公开。登录由 Spring Security 的 `AuthenticationManager` 认证,管理员接口用方法级 `@PreAuthorize("hasRole('ADMIN')")` 鉴权。
 - **响应**:统一结构
 
   ```json
@@ -37,7 +37,9 @@
 
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | 注册普通用户 | 公开 |
+| POST | `/api/auth/register` | 注册普通用户(账号密码) | 公开 |
+| POST | `/api/auth/email-code` | 发送注册邮箱验证码 | 公开 |
+| POST | `/api/auth/email-register` | 邮箱验证码注册 | 公开 |
 | POST | `/api/auth/login` | 登录,返回 `{ token, user }` | 公开 |
 | GET | `/api/user/me` | 当前登录用户信息 | 登录 |
 | PUT | `/api/user/password` | 修改自己的密码 | 登录 |
@@ -59,6 +61,27 @@
 | GET | `/api/logs/statistics` | 用量统计 | 登录(普通用户仅本人) |
 
 > `api_key`、`channel.apiKey` 等敏感写字段为 `@JsonIgnore`,不会在响应里回传;编辑渠道需重新填写上游密钥。
+
+### 邮箱验证码注册流程
+
+两步,均为公开接口;需管理员先在「系统设置」开启邮箱注册并配置 SMTP 邮件服务:
+
+1. **发送验证码** `POST /api/auth/email-code`,体 `{ "email": "user@example.com" }`。
+2. **提交注册** `POST /api/auth/email-register`,体 `{ "username", "password", "email", "code" }` —— 仍需用户名 + 密码,验证码仅校验邮箱所有权(并非无密码登录)。
+
+验证码为 6 位数字、10 分钟内有效、校验成功即失效;同一邮箱 30 秒内只能发送一次。相关业务错误(HTTP 200 + `code`):`1007` 邮箱已注册、`1008` 验证码错误或已过期、`1009` 发送过于频繁、`1010` 邮件服务未配置、`1011` 邮件发送失败。
+
+```bash
+# ① 发送验证码到邮箱
+curl -X POST http://localhost:8321/api/auth/email-code \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+
+# ② 用收到的验证码完成注册
+curl -X POST http://localhost:8321/api/auth/email-register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"secret123","email":"user@example.com","code":"123456"}'
+```
 
 ## 转发接口(OpenAI 兼容,`/v1/**`)
 
