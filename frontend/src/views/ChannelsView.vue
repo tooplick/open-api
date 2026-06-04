@@ -12,6 +12,7 @@ import {
   updateChannel,
   updateChannelStatus,
 } from '@/api/channel'
+import { getPublicSettings } from '@/api/setting'
 import type { Channel, ChannelRequest } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -93,6 +94,15 @@ const fetchingModels = ref(false)
 
 const deleteTarget = ref<Channel | null>(null)
 const showDelete = ref(false)
+const defaultGroup = ref('default')
+const keyGroupsStr = ref('default')
+
+const groupList = computed(() =>
+  keyGroupsStr.value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+)
 
 const formSchema = computed(() =>
   toTypedSchema(
@@ -101,7 +111,7 @@ const formSchema = computed(() =>
       baseUrl: z.string().min(1, '请输入上游地址'),
       apiKey: editingId.value ? z.string().optional() : z.string().min(1, '请填写上游密钥'),
       models: z.string().min(1, '请填写支持的模型'),
-      group: z.string().optional(),
+      group: z.string().min(1, '请选择分组'),
       modelMapping: z.string().optional(),
       weight: z.coerce.number().min(1, '权重至少为 1'),
       priority: z.coerce.number(),
@@ -206,11 +216,22 @@ function goPage(p: number): void {
   void load()
 }
 
-function openCreate(): void {
+async function loadSettings(): Promise<void> {
+  try {
+    const s = await getPublicSettings()
+    defaultGroup.value = s.defaultKeyGroup || 'default'
+    keyGroupsStr.value = s.keyGroups || 'default'
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+async function openCreate(): Promise<void> {
   editingId.value = null
   channelType.value = 'openai'
   fetchedModels.value = []
-  resetForm({ values: { ...defaults } })
+  await loadSettings()
+  resetForm({ values: { ...defaults, group: defaultGroup.value } })
   showForm.value = true
 }
 
@@ -241,7 +262,7 @@ const submit = handleSubmit(async (v) => {
     baseUrl: v.baseUrl.trim(),
     apiKey: (v.apiKey ?? '').trim(),
     models: v.models.trim(),
-    group: v.group?.trim() || 'default',
+    group: v.group?.trim() || defaultGroup.value,
     modelMapping: v.modelMapping?.trim() || undefined,
     weight: Number(v.weight) || 1,
     priority: Number(v.priority) || 0,
@@ -291,7 +312,10 @@ async function confirmDelete(): Promise<void> {
   }
 }
 
-onMounted(() => void load())
+onMounted(() => {
+  void load()
+  void loadSettings()
+})
 </script>
 
 <template>
@@ -522,8 +546,15 @@ onMounted(() => void load())
           <FormField v-slot="{ componentField }" name="group">
             <FormItem>
               <FormLabel>分组</FormLabel>
-              <FormControl><Input v-bind="componentField" placeholder="default" /></FormControl>
-              <FormDescription>逗号分隔可属多组;仅同分组的 API Key 能路由到该渠道</FormDescription>
+              <Select v-bind="componentField">
+                <FormControl>
+                  <SelectTrigger class="w-full"><SelectValue placeholder="选择分组" /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem v-for="g in groupList" :key="g" :value="g">{{ g }}</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription>仅同分组的 API Key 能路由到该渠道</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>

@@ -12,6 +12,7 @@ public class PublicSettingsVO {
     private String siteSubtitle;
     private String loginAnnouncement;
     private String defaultKeyGroup;
+    private String keyGroups;
 
     private boolean registerEnabled;
     private boolean passwordRegisterEnabled;

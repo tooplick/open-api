@@ -63,6 +63,7 @@ public class SystemSettingServiceImpl
         putIfAbsent(SettingKeys.SITE_FOOTER, "AI 模型聚合开放平台");
         putIfAbsent(SettingKeys.LOGIN_ANNOUNCEMENT, "");
         putIfAbsent(SettingKeys.DEFAULT_KEY_GROUP, "default");
+        putIfAbsent(SettingKeys.KEY_GROUPS, "default");
         putIfAbsent(SettingKeys.REGISTER_ENABLED, "true");
         putIfAbsent(SettingKeys.REGISTER_PASSWORD, "true");
         putIfAbsent(SettingKeys.REGISTER_EMAIL, "false");
@@ -83,6 +84,7 @@ public class SystemSettingServiceImpl
         vo.setSiteFooter(get(SettingKeys.SITE_FOOTER, "AI 模型聚合开放平台"));
         vo.setLoginAnnouncement(get(SettingKeys.LOGIN_ANNOUNCEMENT, ""));
         vo.setDefaultKeyGroup(get(SettingKeys.DEFAULT_KEY_GROUP, "default"));
+        vo.setKeyGroups(get(SettingKeys.KEY_GROUPS, "default"));
         vo.setRegisterEnabled(getBool(SettingKeys.REGISTER_ENABLED, true));
         vo.setPasswordRegisterEnabled(getBool(SettingKeys.REGISTER_PASSWORD, true));
         vo.setEmailRegisterEnabled(getBool(SettingKeys.REGISTER_EMAIL, false));
@@ -104,6 +106,7 @@ public class SystemSettingServiceImpl
         vo.setSiteSubtitle(get(SettingKeys.SITE_SUBTITLE, "大模型聚合开放平台"));
         vo.setLoginAnnouncement(get(SettingKeys.LOGIN_ANNOUNCEMENT, ""));
         vo.setDefaultKeyGroup(get(SettingKeys.DEFAULT_KEY_GROUP, "default"));
+        vo.setKeyGroups(get(SettingKeys.KEY_GROUPS, "default"));
         vo.setRegisterEnabled(getBool(SettingKeys.REGISTER_ENABLED, true));
         vo.setPasswordRegisterEnabled(getBool(SettingKeys.REGISTER_PASSWORD, true));
         vo.setEmailRegisterEnabled(getBool(SettingKeys.REGISTER_EMAIL, false));
@@ -119,6 +122,7 @@ public class SystemSettingServiceImpl
         put(SettingKeys.SITE_FOOTER, req.getSiteFooter());
         put(SettingKeys.LOGIN_ANNOUNCEMENT, req.getLoginAnnouncement());
         put(SettingKeys.DEFAULT_KEY_GROUP, req.getDefaultKeyGroup());
+        put(SettingKeys.KEY_GROUPS, req.getKeyGroups());
         put(SettingKeys.REGISTER_ENABLED, String.valueOf(req.isRegisterEnabled()));
         put(SettingKeys.REGISTER_PASSWORD, String.valueOf(req.isPasswordRegisterEnabled()));
         put(SettingKeys.REGISTER_EMAIL, String.valueOf(req.isEmailRegisterEnabled()));
