@@ -5,7 +5,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { toast } from 'vue-sonner'
 import { createKey, deleteKey, listKeys, updateKeyStatus } from '@/api/apikey'
-import { getPublicSettings } from '@/api/setting'
+import { useKeyGroups } from '@/composables/useKeyGroups'
 import type { ApiKey } from '@/types'
 import { formatDateTime, localInputToIso } from '@/utils/format'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   FormControl,
   FormDescription,
   FormField,
@@ -65,7 +72,7 @@ const newlyCreated = ref<ApiKey | null>(null)
 
 const deleteTarget = ref<ApiKey | null>(null)
 const showDelete = ref(false)
-const defaultGroup = ref('default')
+const { defaultGroup, groupList, loadKeyGroups } = useKeyGroups()
 
 const formSchema = toTypedSchema(
   z.object({
@@ -92,7 +99,8 @@ async function load(): Promise<void> {
   }
 }
 
-function openCreate(): void {
+async function openCreate(): Promise<void> {
+  await loadKeyGroups()
   resetForm({ values: { name: '', group: defaultGroup.value, models: '', expireTime: '' } })
   newlyCreated.value = null
   showCreate.value = true
@@ -157,11 +165,7 @@ async function copy(text: string): Promise<void> {
 
 onMounted(() => {
   void load()
-  void getPublicSettings()
-    .then((s) => {
-      defaultGroup.value = s.defaultKeyGroup || 'default'
-    })
-    .catch(() => undefined)
+  void loadKeyGroups()
 })
 </script>
 
@@ -260,9 +264,14 @@ onMounted(() => {
           <FormField v-slot="{ componentField }" name="group">
             <FormItem>
               <FormLabel>分组</FormLabel>
-              <FormControl>
-                <Input v-bind="componentField" placeholder="default" />
-              </FormControl>
+              <Select v-bind="componentField">
+                <FormControl>
+                  <SelectTrigger class="w-full"><SelectValue placeholder="选择分组" /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem v-for="g in groupList" :key="g" :value="g">{{ g }}</SelectItem>
+                </SelectContent>
+              </Select>
               <FormDescription>仅能路由到声明了同一分组的渠道</FormDescription>
               <FormMessage />
             </FormItem>

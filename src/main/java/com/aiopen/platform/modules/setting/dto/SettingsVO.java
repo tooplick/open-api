@@ -13,6 +13,7 @@ public class SettingsVO {
     private String siteFooter;
     private String loginAnnouncement;
     private String defaultKeyGroup;
+    private String keyGroups;
 
     private boolean registerEnabled;
     private boolean passwordRegisterEnabled;

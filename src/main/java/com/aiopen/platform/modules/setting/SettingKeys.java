@@ -13,6 +13,8 @@ public final class SettingKeys {
     public static final String SITE_FOOTER = "site.footer";
     public static final String LOGIN_ANNOUNCEMENT = "login.announcement";
     public static final String DEFAULT_KEY_GROUP = "key.default_group";
+    /** 所有可用分组,逗号分隔 */
+    public static final String KEY_GROUPS = "key.groups";
 
     /** 注册总开关 */
     public static final String REGISTER_ENABLED = "register.enabled";

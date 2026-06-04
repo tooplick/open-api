@@ -194,6 +194,7 @@ export interface Settings {
   siteFooter: string
   loginAnnouncement: string
   defaultKeyGroup: string
+  keyGroups: string
   registerEnabled: boolean
   passwordRegisterEnabled: boolean
   emailRegisterEnabled: boolean
@@ -211,6 +212,7 @@ export interface PublicSettings {
   siteSubtitle: string
   loginAnnouncement: string
   defaultKeyGroup: string
+  keyGroups: string
   registerEnabled: boolean
   passwordRegisterEnabled: boolean
   emailRegisterEnabled: boolean

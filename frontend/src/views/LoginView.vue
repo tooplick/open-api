@@ -28,6 +28,7 @@ const pub = reactive<PublicSettings>({
   siteSubtitle: '大模型聚合开放平台 · 控制台',
   loginAnnouncement: '',
   defaultKeyGroup: 'default',
+  keyGroups: 'default',
   registerEnabled: true,
   passwordRegisterEnabled: true,
   emailRegisterEnabled: false,
