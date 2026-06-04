@@ -12,7 +12,7 @@ import {
   updateChannel,
   updateChannelStatus,
 } from '@/api/channel'
-import { getPublicSettings } from '@/api/setting'
+import { useKeyGroups } from '@/composables/useKeyGroups'
 import type { Channel, ChannelRequest } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -94,15 +94,7 @@ const fetchingModels = ref(false)
 
 const deleteTarget = ref<Channel | null>(null)
 const showDelete = ref(false)
-const defaultGroup = ref('default')
-const keyGroupsStr = ref('default')
-
-const groupList = computed(() =>
-  keyGroupsStr.value
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
-)
+const { defaultGroup, groupList, loadKeyGroups } = useKeyGroups()
 
 const formSchema = computed(() =>
   toTypedSchema(
@@ -216,21 +208,11 @@ function goPage(p: number): void {
   void load()
 }
 
-async function loadSettings(): Promise<void> {
-  try {
-    const s = await getPublicSettings()
-    defaultGroup.value = s.defaultKeyGroup || 'default'
-    keyGroupsStr.value = s.keyGroups || 'default'
-  } catch {
-    // 拦截器已提示
-  }
-}
-
 async function openCreate(): Promise<void> {
   editingId.value = null
   channelType.value = 'openai'
   fetchedModels.value = []
-  await loadSettings()
+  await loadKeyGroups()
   resetForm({ values: { ...defaults, group: defaultGroup.value } })
   showForm.value = true
 }
@@ -314,7 +296,7 @@ async function confirmDelete(): Promise<void> {
 
 onMounted(() => {
   void load()
-  void loadSettings()
+  void loadKeyGroups()
 })
 </script>
 

@@ -70,10 +70,14 @@ async function confirmAddGroup(): Promise<void> {
     return
   }
   const groups = [...groupList.value, name]
+  const previousKeyGroups = form.keyGroups
   form.keyGroups = groups.join(',')
-  showAddGroup.value = false
-  await doSave()
-  toast.success(`已添加分组「${name}」`)
+  if (await doSave()) {
+    showAddGroup.value = false
+    toast.success(`已添加分组「${name}」`)
+    return
+  }
+  form.keyGroups = previousKeyGroups
 }
 
 function askDeleteGroup(name: string): void {
@@ -89,13 +93,20 @@ async function confirmDeleteGroup(): Promise<void> {
   const name = deleteGroupTarget.value
   if (!name) return
   const groups = groupList.value.filter((g) => g !== name)
+  const previousKeyGroups = form.keyGroups
+  const previousDefaultKeyGroup = form.defaultKeyGroup
   form.keyGroups = groups.join(',')
   if (form.defaultKeyGroup === name) {
     form.defaultKeyGroup = groups[0] || 'default'
   }
-  showDeleteGroup.value = false
-  await doSave()
-  toast.success(`已删除分组「${name}」`)
+  if (await doSave()) {
+    showDeleteGroup.value = false
+    deleteGroupTarget.value = null
+    toast.success(`已删除分组「${name}」`)
+    return
+  }
+  form.keyGroups = previousKeyGroups
+  form.defaultKeyGroup = previousDefaultKeyGroup
 }
 
 const form = reactive<Settings>({
@@ -130,13 +141,15 @@ async function load(): Promise<void> {
   }
 }
 
-async function doSave(): Promise<void> {
+async function doSave(): Promise<boolean> {
   saving.value = true
   try {
     await updateSettings({ ...form })
+    return true
   }
   catch {
     // 拦截器已提示
+    return false
   }
   finally {
     saving.value = false
@@ -144,8 +157,9 @@ async function doSave(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  await doSave()
-  toast.success('设置已保存')
+  if (await doSave()) {
+    toast.success('设置已保存')
+  }
 }
 
 onMounted(() => void load())

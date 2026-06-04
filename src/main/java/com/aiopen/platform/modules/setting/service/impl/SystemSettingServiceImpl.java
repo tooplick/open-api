@@ -1,5 +1,7 @@
 package com.aiopen.platform.modules.setting.service.impl;
 
+import com.aiopen.platform.common.exception.BusinessException;
+import com.aiopen.platform.common.result.ResultCode;
 import com.aiopen.platform.modules.setting.SettingKeys;
 import com.aiopen.platform.modules.setting.dto.PublicSettingsVO;
 import com.aiopen.platform.modules.setting.dto.SettingsVO;
@@ -12,11 +14,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+
 @Service
 public class SystemSettingServiceImpl
         extends ServiceImpl<SystemSettingMapper, SystemSetting>
         implements SystemSettingService {
 
+    private static final String DEFAULT_GROUP = "default";
     private static final String SMTP_PASSWORD_MASK = "******";
 
     @Override
@@ -79,12 +86,16 @@ public class SystemSettingServiceImpl
     @Override
     public SettingsVO getSettings() {
         SettingsVO vo = new SettingsVO();
+        KeyGroupConfig keyGroupConfig = normalizeKeyGroups(
+                get(SettingKeys.KEY_GROUPS, DEFAULT_GROUP),
+                get(SettingKeys.DEFAULT_KEY_GROUP, DEFAULT_GROUP),
+                false);
         vo.setSiteName(get(SettingKeys.SITE_NAME, "AI Open Platform"));
         vo.setSiteSubtitle(get(SettingKeys.SITE_SUBTITLE, "大模型聚合开放平台"));
         vo.setSiteFooter(get(SettingKeys.SITE_FOOTER, "AI 模型聚合开放平台"));
         vo.setLoginAnnouncement(get(SettingKeys.LOGIN_ANNOUNCEMENT, ""));
-        vo.setDefaultKeyGroup(get(SettingKeys.DEFAULT_KEY_GROUP, "default"));
-        vo.setKeyGroups(get(SettingKeys.KEY_GROUPS, "default"));
+        vo.setDefaultKeyGroup(keyGroupConfig.defaultGroup());
+        vo.setKeyGroups(keyGroupConfig.groups());
         vo.setRegisterEnabled(getBool(SettingKeys.REGISTER_ENABLED, true));
         vo.setPasswordRegisterEnabled(getBool(SettingKeys.REGISTER_PASSWORD, true));
         vo.setEmailRegisterEnabled(getBool(SettingKeys.REGISTER_EMAIL, false));
@@ -102,11 +113,15 @@ public class SystemSettingServiceImpl
     @Override
     public PublicSettingsVO getPublicSettings() {
         PublicSettingsVO vo = new PublicSettingsVO();
+        KeyGroupConfig keyGroupConfig = normalizeKeyGroups(
+                get(SettingKeys.KEY_GROUPS, DEFAULT_GROUP),
+                get(SettingKeys.DEFAULT_KEY_GROUP, DEFAULT_GROUP),
+                false);
         vo.setSiteName(get(SettingKeys.SITE_NAME, "AI Open Platform"));
         vo.setSiteSubtitle(get(SettingKeys.SITE_SUBTITLE, "大模型聚合开放平台"));
         vo.setLoginAnnouncement(get(SettingKeys.LOGIN_ANNOUNCEMENT, ""));
-        vo.setDefaultKeyGroup(get(SettingKeys.DEFAULT_KEY_GROUP, "default"));
-        vo.setKeyGroups(get(SettingKeys.KEY_GROUPS, "default"));
+        vo.setDefaultKeyGroup(keyGroupConfig.defaultGroup());
+        vo.setKeyGroups(keyGroupConfig.groups());
         vo.setRegisterEnabled(getBool(SettingKeys.REGISTER_ENABLED, true));
         vo.setPasswordRegisterEnabled(getBool(SettingKeys.REGISTER_PASSWORD, true));
         vo.setEmailRegisterEnabled(getBool(SettingKeys.REGISTER_EMAIL, false));
@@ -117,12 +132,13 @@ public class SystemSettingServiceImpl
     @Override
     @Transactional
     public void updateSettings(SettingsVO req) {
+        KeyGroupConfig keyGroupConfig = normalizeKeyGroups(req.getKeyGroups(), req.getDefaultKeyGroup(), true);
         put(SettingKeys.SITE_NAME, req.getSiteName());
         put(SettingKeys.SITE_SUBTITLE, req.getSiteSubtitle());
         put(SettingKeys.SITE_FOOTER, req.getSiteFooter());
         put(SettingKeys.LOGIN_ANNOUNCEMENT, req.getLoginAnnouncement());
-        put(SettingKeys.DEFAULT_KEY_GROUP, req.getDefaultKeyGroup());
-        put(SettingKeys.KEY_GROUPS, req.getKeyGroups());
+        put(SettingKeys.DEFAULT_KEY_GROUP, keyGroupConfig.defaultGroup());
+        put(SettingKeys.KEY_GROUPS, keyGroupConfig.groups());
         put(SettingKeys.REGISTER_ENABLED, String.valueOf(req.isRegisterEnabled()));
         put(SettingKeys.REGISTER_PASSWORD, String.valueOf(req.isPasswordRegisterEnabled()));
         put(SettingKeys.REGISTER_EMAIL, String.valueOf(req.isEmailRegisterEnabled()));
@@ -159,5 +175,40 @@ public class SystemSettingServiceImpl
         } catch (NumberFormatException | NullPointerException e) {
             return def;
         }
+    }
+
+    private KeyGroupConfig normalizeKeyGroups(String rawGroups, String rawDefaultGroup, boolean strict) {
+        List<String> groups = parseKeyGroups(rawGroups);
+        if (groups.isEmpty()) {
+            if (strict) {
+                throw new BusinessException(ResultCode.BAD_REQUEST, "At least one key group is required");
+            }
+            groups.add(DEFAULT_GROUP);
+        }
+
+        String defaultGroup = StringUtils.hasText(rawDefaultGroup) ? rawDefaultGroup.trim() : groups.get(0);
+        if (!groups.contains(defaultGroup)) {
+            if (strict) {
+                throw new BusinessException(ResultCode.BAD_REQUEST, "Default key group must be in key groups");
+            }
+            defaultGroup = groups.get(0);
+        }
+        return new KeyGroupConfig(defaultGroup, String.join(",", groups));
+    }
+
+    private List<String> parseKeyGroups(String rawGroups) {
+        LinkedHashSet<String> groups = new LinkedHashSet<>();
+        if (StringUtils.hasText(rawGroups)) {
+            for (String part : rawGroups.split(",")) {
+                String group = part.trim();
+                if (StringUtils.hasText(group)) {
+                    groups.add(group);
+                }
+            }
+        }
+        return new ArrayList<>(groups);
+    }
+
+    private record KeyGroupConfig(String defaultGroup, String groups) {
     }
 }

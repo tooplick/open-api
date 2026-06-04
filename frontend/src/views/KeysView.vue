@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { toast } from 'vue-sonner'
 import { createKey, deleteKey, listKeys, updateKeyStatus } from '@/api/apikey'
-import { getPublicSettings } from '@/api/setting'
+import { useKeyGroups } from '@/composables/useKeyGroups'
 import type { ApiKey } from '@/types'
 import { formatDateTime, localInputToIso } from '@/utils/format'
 import { Button } from '@/components/ui/button'
@@ -72,15 +72,7 @@ const newlyCreated = ref<ApiKey | null>(null)
 
 const deleteTarget = ref<ApiKey | null>(null)
 const showDelete = ref(false)
-const defaultGroup = ref('default')
-const keyGroupsStr = ref('default')
-
-const groupList = computed(() =>
-  keyGroupsStr.value
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
-)
+const { defaultGroup, groupList, loadKeyGroups } = useKeyGroups()
 
 const formSchema = toTypedSchema(
   z.object({
@@ -107,18 +99,8 @@ async function load(): Promise<void> {
   }
 }
 
-async function loadSettings(): Promise<void> {
-  try {
-    const s = await getPublicSettings()
-    defaultGroup.value = s.defaultKeyGroup || 'default'
-    keyGroupsStr.value = s.keyGroups || 'default'
-  } catch {
-    // 拦截器已提示
-  }
-}
-
 async function openCreate(): Promise<void> {
-  await loadSettings()
+  await loadKeyGroups()
   resetForm({ values: { name: '', group: defaultGroup.value, models: '', expireTime: '' } })
   newlyCreated.value = null
   showCreate.value = true
@@ -183,7 +165,7 @@ async function copy(text: string): Promise<void> {
 
 onMounted(() => {
   void load()
-  void loadSettings()
+  void loadKeyGroups()
 })
 </script>
 
