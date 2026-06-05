@@ -209,7 +209,7 @@ onMounted(() => {
       </Tabs>
     </div>
 
-    <div class="grid grid-cols-4 gap-6 max-xl:grid-cols-2 max-sm:grid-cols-1">
+    <div class="grid grid-cols-4 gap-6 max-xl:grid-cols-2 max-sm:grid-cols-1" data-tour="dashboard-stats">
       <Card v-for="c in cards" :key="c.key">
         <CardContent>
           <div class="flex items-center justify-between">

@@ -173,7 +173,7 @@ onMounted(() => {
   <div>
     <div class="mb-6 flex items-center justify-between gap-3">
       <span class="text-sm text-muted-foreground">用于调用 OpenAI 兼容接口(/v1/**)的密钥</span>
-      <Button @click="openCreate">+ 创建 API Key</Button>
+      <Button @click="openCreate" data-tour="create-key-btn">+ 创建 API Key</Button>
     </div>
 
     <Card class="gap-0 overflow-hidden p-0">

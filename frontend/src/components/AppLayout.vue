@@ -5,6 +5,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   BoxesIcon,
   ChevronsUpDownIcon,
+  CircleHelpIcon,
   CircleUserIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -16,7 +17,9 @@ import {
   UsersIcon,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
+import { TOUR_COMPLETED_KEY, TOUR_PENDING_KEY } from '@/utils/constants'
 import AppSidebarCollapse from './AppSidebarCollapse.vue'
+import AppTour from './AppTour.vue' // 渲染 overlay;通过 ref 调用 start()
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -96,6 +99,7 @@ function logout(): void {
 // ⌘K command palette
 const cmdOpen = ref(false)
 const query = ref('')
+const appTourRef = ref<InstanceType<typeof AppTour> | null>(null)
 const filteredNav = computed(() => {
   const q = query.value.trim().toLowerCase()
   if (!q) return visibleNav.value
@@ -115,7 +119,16 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  if (
+    localStorage.getItem(TOUR_PENDING_KEY) === '1'
+    && localStorage.getItem(TOUR_COMPLETED_KEY) !== '1'
+  ) {
+    localStorage.removeItem(TOUR_PENDING_KEY)
+    window.setTimeout(() => appTourRef.value?.start(), 250)
+  }
+})
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
@@ -138,7 +151,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <SidebarGroup>
           <SidebarGroupLabel>导航</SidebarGroupLabel>
           <SidebarMenu>
-            <SidebarMenuItem v-for="item in visibleNav" :key="item.name">
+            <SidebarMenuItem v-for="item in visibleNav" :key="item.name" :data-tour-nav="item.name">
               <SidebarMenuButton
                 as-child
                 :is-active="route.name === item.name"
@@ -187,6 +200,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         </Breadcrumb>
 
         <div class="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="text-muted-foreground"
+            @click="appTourRef?.start()"
+          >
+            <CircleHelpIcon class="size-4" />
+            <span class="sr-only">使用教程</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -260,5 +283,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         </CommandGroup>
       </CommandList>
     </CommandDialog>
+
+    <AppTour ref="appTourRef" />
   </SidebarProvider>
 </template>

@@ -46,7 +46,7 @@ onMounted(() => void load())
       </span>
     </div>
 
-    <Card class="gap-0 overflow-hidden p-0">
+    <Card class="gap-0 overflow-hidden p-0" data-tour="model-list">
       <div v-if="loading" class="space-y-3 p-4">
         <Skeleton v-for="i in 8" :key="i" class="h-10 w-full" />
       </div>

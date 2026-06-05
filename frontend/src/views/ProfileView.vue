@@ -43,7 +43,7 @@ const onSubmit = handleSubmit(async (values) => {
 
 <template>
   <div class="grid max-w-[860px] grid-cols-2 items-start gap-6 max-md:grid-cols-1">
-    <Card>
+    <Card data-tour="profile-card">
       <CardHeader>
         <CardTitle>账户信息</CardTitle>
       </CardHeader>
