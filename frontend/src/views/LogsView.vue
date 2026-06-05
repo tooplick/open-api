@@ -223,7 +223,7 @@ onMounted(() => {
       </CardContent>
     </Card>
 
-    <Card class="gap-0 overflow-hidden p-0">
+    <Card class="gap-0 overflow-hidden p-0" data-tour="log-table">
       <div v-if="loading" class="space-y-3 p-4">
         <Skeleton v-for="i in 8" :key="i" class="h-11 w-full" />
       </div>

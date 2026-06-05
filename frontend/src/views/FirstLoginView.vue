@@ -5,6 +5,7 @@ import * as z from 'zod'
 import { toast } from 'vue-sonner'
 import { ShieldAlertIcon } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
+import { TOUR_PENDING_KEY } from '@/utils/constants'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ async function onSubmit(values: any): Promise<void> {
   try {
     await auth.completeFirstLogin(values.username, values.newPassword)
     toast.success('已更新账号与密码')
+    localStorage.setItem(TOUR_PENDING_KEY, '1')
     await router.replace({ name: 'dashboard' })
   }
   catch {

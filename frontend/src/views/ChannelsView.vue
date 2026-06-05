@@ -310,7 +310,7 @@ onMounted(() => {
       <Button @click="openCreate">+ 新建渠道</Button>
     </div>
 
-    <Card class="gap-0 overflow-hidden p-0">
+    <Card class="gap-0 overflow-hidden p-0" data-tour="channel-table">
       <div v-if="loading" class="space-y-3 p-4">
         <Skeleton v-for="i in 6" :key="i" class="h-12 w-full" />
       </div>
