@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
@@ -173,7 +172,7 @@ onMounted(() => void load())
           系统设置
         </h2>
         <p class="text-muted-foreground mt-1 text-sm">
-          站点信息、注册方式与默认分组,保存后即时生效
+          分组、注册方式与 SMTP 邮件服务,保存后即时生效
         </p>
       </div>
       <Button :disabled="saving || loading" @click="save">
@@ -188,31 +187,6 @@ onMounted(() => void load())
     </template>
 
     <template v-else>
-      <Card>
-        <CardHeader>
-          <CardTitle>站点信息</CardTitle>
-          <CardDescription>显示在登录页、侧边栏与浏览器标题</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <div class="space-y-1.5">
-            <Label>站点名称</Label>
-            <Input v-model="form.siteName" placeholder="AI Open Platform" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>副标题</Label>
-            <Input v-model="form.siteSubtitle" placeholder="大模型聚合开放平台" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>页脚标语</Label>
-            <Input v-model="form.siteFooter" placeholder="AI 模型聚合开放平台" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>登录页公告</Label>
-            <Textarea v-model="form.loginAnnouncement" placeholder="可选,展示在登录页(如维护通知)" />
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>分组管理</CardTitle>

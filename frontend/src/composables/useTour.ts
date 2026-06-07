@@ -97,7 +97,7 @@ function buildSteps(isAdmin: boolean): StepConfig[] {
           element: '[data-tour="settings-form"]' as string,
           routeName: 'settings',
           title: '系统设置',
-          description: '配置站点名称、注册开关、默认分组和 SMTP 邮件服务。保存后即时生效。',
+          description: '配置默认分组、注册开关和 SMTP 邮件服务。保存后即时生效。',
           side: 'top' as const,
         }]
       : []),
