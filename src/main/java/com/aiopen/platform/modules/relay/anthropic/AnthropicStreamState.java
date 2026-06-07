@@ -30,4 +30,6 @@ public class AnthropicStreamState {
     private int currentType = BLOCK_NONE;
     /** OpenAI 流式 tool_call 的 index -> 已分配的 Anthropic content block 索引 */
     private final Map<Integer, Integer> toolCallBlocks = new HashMap<>();
+    private final StringBuilder textBuffer = new StringBuilder();
+    private boolean emittedToolUse;
 }

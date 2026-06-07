@@ -9,8 +9,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Anthropic 入站协议转换器:把客户端的 Anthropic /v1/messages 请求转为 OpenAI /chat/completions,
@@ -22,7 +26,34 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AnthropicConverter {
 
+    private static final Pattern TEXT_FUNCTION_MARKER =
+            Pattern.compile("(?m)^[ \\t]*<function=([^>\\r\\n]+)>[ \\t]*$");
+    private static final Pattern TEXT_PARAMETER_MARKER =
+            Pattern.compile("(?m)^[ \\t]*<parameter=([^>\\r\\n]+)>(.*)$");
+
     private final ObjectMapper objectMapper;
+
+    private enum ParsedBlockType {
+        TEXT,
+        TOOL
+    }
+
+    private record ParsedBlock(ParsedBlockType type, String text, String toolName, ObjectNode input) {
+
+        static ParsedBlock text(String text) {
+            return new ParsedBlock(ParsedBlockType.TEXT, text, null, null);
+        }
+
+        static ParsedBlock tool(String toolName, ObjectNode input) {
+            return new ParsedBlock(ParsedBlockType.TOOL, null, toolName, input);
+        }
+    }
+
+    private record FunctionMarker(int start, int end, String name) {
+    }
+
+    private record ParameterMarker(int start, int valueStart, String name) {
+    }
 
     // ---------- 请求: Anthropic -> OpenAI ----------
 
@@ -93,11 +124,7 @@ public class AnthropicConverter {
             msg.put("role", "assistant");
             msg.put("model", requestedModel);
             ArrayNode contentArr = msg.putArray("content");
-            if (!content.isEmpty()) {
-                ObjectNode textBlock = contentArr.addObject();
-                textBlock.put("type", "text");
-                textBlock.put("text", content);
-            }
+            int toolUseBlocks = appendParsedContentBlocks(contentArr, parseAssistantContent(content));
             JsonNode toolCalls = message.get("tool_calls");
             if (toolCalls != null && toolCalls.isArray()) {
                 for (JsonNode call : toolCalls) {
@@ -106,6 +133,7 @@ public class AnthropicConverter {
                     block.put("id", call.path("id").asText());
                     block.put("name", call.path("function").path("name").asText());
                     block.set("input", parseToolArguments(call.path("function").path("arguments").asText("")));
+                    toolUseBlocks++;
                 }
             }
             if (contentArr.isEmpty()) {
@@ -113,7 +141,7 @@ public class AnthropicConverter {
                 textBlock.put("type", "text");
                 textBlock.put("text", "");
             }
-            msg.put("stop_reason", mapFinishToStop(finish));
+            msg.put("stop_reason", toolUseBlocks > 0 ? "tool_use" : mapFinishToStop(finish));
             msg.putNull("stop_sequence");
             ObjectNode usageNode = msg.putObject("usage");
             usageNode.put("input_tokens", input);
@@ -183,13 +211,13 @@ public class AnthropicConverter {
         // 文本增量
         String text = delta.path("content").asText("");
         if (!text.isEmpty()) {
-            sb.append(ensureTextBlock(state));
-            sb.append(textDelta(state.getCurrentIndex(), text));
+            sb.append(bufferTextDelta(text, state));
         }
 
         // 工具调用增量(OpenAI delta.tool_calls -> Anthropic tool_use 块)
         JsonNode toolCalls = delta.get("tool_calls");
         if (toolCalls != null && toolCalls.isArray()) {
+            sb.append(flushBufferedText(state));
             for (JsonNode tc : toolCalls) {
                 int oaiIndex = tc.path("index").asInt(0);
                 Integer blockIndex = state.getToolCallBlocks().get(oaiIndex);
@@ -207,6 +235,7 @@ public class AnthropicConverter {
                     sb.append(toolBlockStart(blockIndex, id, name));
                     state.setCurrentIndex(blockIndex);
                     state.setCurrentType(AnthropicStreamState.BLOCK_TOOL);
+                    state.setEmittedToolUse(true);
                 }
                 String args = tc.path("function").path("arguments").asText("");
                 if (!args.isEmpty()) {
@@ -222,11 +251,14 @@ public class AnthropicConverter {
     public String streamEnd(AnthropicStreamState state, Usage usageOut) {
         usageOut.totalTokens = usageOut.promptTokens + usageOut.completionTokens;
         StringBuilder sb = new StringBuilder();
+        sb.append(flushBufferedText(state));
         sb.append(closeCurrentBlock(state));
         ObjectNode md = objectMapper.createObjectNode();
         md.put("type", "message_delta");
         ObjectNode delta = md.putObject("delta");
-        delta.put("stop_reason", state.getStopReason() == null ? "end_turn" : state.getStopReason());
+        delta.put("stop_reason", state.isEmittedToolUse()
+                ? "tool_use"
+                : state.getStopReason() == null ? "end_turn" : state.getStopReason());
         delta.putNull("stop_sequence");
         ObjectNode usage = md.putObject("usage");
         usage.put("output_tokens", state.getCompletionTokens());
@@ -422,9 +454,192 @@ public class AnthropicConverter {
         }
     }
 
-    // ---------- 工具转换 helper(流式) ----------
+    // ---------- Text fallback tool call helpers ----------
 
-    /** 确保当前处于 text 块;若不是则关闭旧块并开一个新的 text 块,返回需写出的事件。 */
+    // Some OpenAI-compatible upstreams emit Claude Code function tags as text.
+    private List<ParsedBlock> parseAssistantContent(String content) {
+        List<ParsedBlock> blocks = new ArrayList<>();
+        if (content == null || content.isEmpty()) {
+            return blocks;
+        }
+
+        List<FunctionMarker> functions = new ArrayList<>();
+        Matcher matcher = TEXT_FUNCTION_MARKER.matcher(content);
+        while (matcher.find()) {
+            functions.add(new FunctionMarker(matcher.start(), matcher.end(), matcher.group(1).trim()));
+        }
+        if (functions.isEmpty()) {
+            addTextBlock(blocks, content, false);
+            return blocks;
+        }
+
+        int cursor = 0;
+        for (int i = 0; i < functions.size(); i++) {
+            FunctionMarker fn = functions.get(i);
+            addTextBlock(blocks, content.substring(cursor, fn.start()), true);
+            int blockEnd = i + 1 < functions.size() ? functions.get(i + 1).start() : content.length();
+            if (!fn.name().isEmpty()) {
+                blocks.add(ParsedBlock.tool(fn.name(), parseFunctionInput(content.substring(fn.end(), blockEnd))));
+            }
+            cursor = blockEnd;
+        }
+        addTextBlock(blocks, content.substring(cursor), true);
+        return blocks;
+    }
+
+    private ObjectNode parseFunctionInput(String block) {
+        ObjectNode input = objectMapper.createObjectNode();
+        List<ParameterMarker> parameters = new ArrayList<>();
+        Matcher matcher = TEXT_PARAMETER_MARKER.matcher(block);
+        while (matcher.find()) {
+            parameters.add(new ParameterMarker(matcher.start(), matcher.start(2), matcher.group(1).trim()));
+        }
+
+        for (int i = 0; i < parameters.size(); i++) {
+            ParameterMarker parameter = parameters.get(i);
+            if (parameter.name().isEmpty()) {
+                continue;
+            }
+            int valueEnd = i + 1 < parameters.size() ? parameters.get(i + 1).start() : block.length();
+            input.put(parameter.name(), cleanParameterValue(block.substring(parameter.valueStart(), valueEnd)));
+        }
+        return input;
+    }
+
+    private String cleanParameterValue(String raw) {
+        int closeParameter = raw.indexOf("</parameter>");
+        if (closeParameter >= 0) {
+            raw = raw.substring(0, closeParameter);
+        }
+        int closeFunction = raw.indexOf("</function>");
+        if (closeFunction >= 0) {
+            raw = raw.substring(0, closeFunction);
+        }
+        if (raw.startsWith("\r\n")) {
+            raw = raw.substring(2);
+        } else if (raw.startsWith("\n") || raw.startsWith("\r")) {
+            raw = raw.substring(1);
+        }
+        return raw.stripTrailing();
+    }
+
+    private void addTextBlock(List<ParsedBlock> blocks, String text, boolean trimEdges) {
+        String value = trimEdges ? text.strip() : text;
+        if (!value.isEmpty()) {
+            blocks.add(ParsedBlock.text(value));
+        }
+    }
+
+    private int appendParsedContentBlocks(ArrayNode contentArr, List<ParsedBlock> blocks) {
+        int toolUseBlocks = 0;
+        for (ParsedBlock block : blocks) {
+            if (block.type() == ParsedBlockType.TEXT) {
+                ObjectNode textBlock = contentArr.addObject();
+                textBlock.put("type", "text");
+                textBlock.put("text", block.text());
+            } else {
+                ObjectNode toolBlock = contentArr.addObject();
+                toolBlock.put("type", "tool_use");
+                toolBlock.put("id", "toolu_" + java.util.UUID.randomUUID().toString().replace("-", ""));
+                toolBlock.put("name", block.toolName());
+                toolBlock.set("input", block.input());
+                toolUseBlocks++;
+            }
+        }
+        return toolUseBlocks;
+    }
+
+    private String bufferTextDelta(String text, AnthropicStreamState state) {
+        state.getTextBuffer().append(text);
+        if (hasFunctionMarker(state.getTextBuffer())) {
+            return "";
+        }
+
+        int flushEnd = lastCompleteLineEnd(state.getTextBuffer());
+        if (flushEnd > 0) {
+            String safeText = state.getTextBuffer().substring(0, flushEnd);
+            state.getTextBuffer().delete(0, flushEnd);
+            return emitTextDelta(state, safeText);
+        }
+
+        String pending = state.getTextBuffer().toString();
+        if (!couldBeFunctionMarkerPrefix(pending)) {
+            state.getTextBuffer().setLength(0);
+            return emitTextDelta(state, pending);
+        }
+        return "";
+    }
+
+    private boolean hasFunctionMarker(CharSequence text) {
+        return TEXT_FUNCTION_MARKER.matcher(text).find();
+    }
+
+    private int lastCompleteLineEnd(StringBuilder text) {
+        int lastLf = text.lastIndexOf("\n");
+        int lastCr = text.lastIndexOf("\r");
+        if (lastLf < 0 && lastCr < 0) {
+            return -1;
+        }
+        if (lastLf > lastCr) {
+            return lastLf + 1;
+        }
+        if (lastCr + 1 < text.length() && text.charAt(lastCr + 1) == '\n') {
+            return lastCr + 2;
+        }
+        return lastCr + 1;
+    }
+
+    private boolean couldBeFunctionMarkerPrefix(String text) {
+        String value = text.stripLeading();
+        return value.isEmpty() || "<function=".startsWith(value) || value.startsWith("<function=");
+    }
+
+    private String emitTextDelta(AnthropicStreamState state, String text) {
+        if (text.isEmpty()) {
+            return "";
+        }
+        return ensureTextBlock(state) + textDelta(state.getCurrentIndex(), text);
+    }
+
+    private String flushBufferedText(AnthropicStreamState state) {
+        if (state.getTextBuffer().isEmpty()) {
+            return "";
+        }
+        String content = state.getTextBuffer().toString();
+        state.getTextBuffer().setLength(0);
+        List<ParsedBlock> blocks = parseAssistantContent(content);
+        if (blocks.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(closeCurrentBlock(state));
+        for (ParsedBlock block : blocks) {
+            if (block.type() == ParsedBlockType.TEXT) {
+                sb.append(ensureTextBlock(state));
+                sb.append(textDelta(state.getCurrentIndex(), block.text()));
+                sb.append(closeCurrentBlock(state));
+            } else {
+                int index = state.getNextIndex();
+                state.setNextIndex(index + 1);
+                String id = "toolu_" + java.util.UUID.randomUUID().toString().replace("-", "");
+                sb.append(toolBlockStart(index, id, block.toolName()));
+                state.setCurrentIndex(index);
+                state.setCurrentType(AnthropicStreamState.BLOCK_TOOL);
+                try {
+                    sb.append(inputJsonDelta(index, objectMapper.writeValueAsString(block.input())));
+                } catch (Exception e) {
+                    sb.append(inputJsonDelta(index, "{}"));
+                }
+                sb.append(closeCurrentBlock(state));
+                state.setEmittedToolUse(true);
+            }
+        }
+        return sb.toString();
+    }
+
+    // ---------- Streaming helpers ----------
+
     private String ensureTextBlock(AnthropicStreamState state) {
         if (state.getCurrentType() == AnthropicStreamState.BLOCK_TEXT) {
             return "";
