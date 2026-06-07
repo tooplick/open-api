@@ -59,7 +59,7 @@
 | PUT | `/api/channels/{id}` | 更新渠道 | 管理员 |
 | PUT | `/api/channels/{id}/status` | 启用/禁用(`?status=1\|0`) | 管理员 |
 | DELETE | `/api/channels/{id}` | 删除渠道 | 管理员 |
-| GET | `/api/models` | 所有可用模型(`string[]`) | 登录 |
+| GET | `/api/models` | 所有可用模型(`string[]`),可选 `?group=default` 查看指定分组 | 登录 |
 | GET | `/api/logs/page` | 调用日志分页 | 登录(普通用户仅本人) |
 | GET | `/api/logs/statistics` | 用量统计 | 登录(普通用户仅本人) |
 

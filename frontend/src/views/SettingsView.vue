@@ -35,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { XIcon } from '@lucide/vue'
+import { SaveIcon, XIcon } from '@lucide/vue'
 
 const loading = ref(true)
 const saving = ref(false)
@@ -182,10 +182,6 @@ onMounted(() => void load())
           分组、注册方式与 SMTP 邮件服务,保存后即时生效
         </p>
       </div>
-      <Button :disabled="saving || loading" @click="save">
-        <Spinner v-if="saving" />
-        保存设置
-      </Button>
     </div>
 
     <template v-if="loading">
@@ -441,5 +437,17 @@ onMounted(() => void load())
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <Button
+      v-if="!loading"
+      class="fixed right-6 bottom-6 z-50 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
+      :disabled="saving"
+      aria-label="保存设置"
+      title="保存设置"
+      @click="save"
+    >
+      <Spinner v-if="saving" />
+      <SaveIcon v-else class="size-5" />
+    </Button>
   </div>
 </template>

@@ -5,6 +5,7 @@ import com.aiopen.platform.modules.ability.service.AbilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,9 +20,9 @@ public class ModelController {
 
     private final AbilityService abilityService;
 
-    /** 所有可用模型(去重、排序) */
+    /** 所有可用模型,或指定分组下的可用模型(去重、排序) */
     @GetMapping
-    public Result<List<String>> list() {
-        return Result.success(abilityService.distinctModels());
+    public Result<List<String>> list(@RequestParam(required = false) String group) {
+        return Result.success(abilityService.distinctModels(group));
     }
 }
