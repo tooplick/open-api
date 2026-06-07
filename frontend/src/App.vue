@@ -5,5 +5,5 @@ import { Toaster } from '@/components/ui/sonner'
 
 <template>
   <RouterView />
-  <Toaster position="top-right" rich-colors />
+  <Toaster position="top-center" rich-colors :swipe-directions="['left', 'right']" />
 </template>

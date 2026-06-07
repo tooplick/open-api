@@ -70,7 +70,6 @@ const registerSchema = toTypedSchema(
   z.object({
     username: z.string().min(3, '用户名 3-50 位').max(50, '用户名 3-50 位'),
     password: z.string().min(6, '密码 6-50 位').max(50, '密码 6-50 位'),
-    email: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
   }),
 )
 const emailRegisterSchema = toTypedSchema(
@@ -99,7 +98,6 @@ async function onRegister(values: any): Promise<void> {
     await registerApi({
       username: values.username,
       password: values.password,
-      email: values.email || undefined,
     })
     toast.success('注册成功,请登录')
     loginInitial.value = { username: values.username, password: '' }
@@ -268,15 +266,6 @@ async function onEmailRegister(values: any): Promise<void> {
                           placeholder="6-50 位"
                           autocomplete="new-password"
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  </FormField>
-                  <FormField v-slot="{ componentField }" name="email">
-                    <FormItem>
-                      <FormLabel>邮箱</FormLabel>
-                      <FormControl>
-                        <Input v-bind="componentField" type="email" placeholder="可选" autocomplete="email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
