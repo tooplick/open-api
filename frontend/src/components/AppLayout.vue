@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { TOUR_COMPLETED_KEY, TOUR_PENDING_KEY } from '@/utils/constants'
 import AppSidebarCollapse from './AppSidebarCollapse.vue'
+import ClaudeMark from './icons/ClaudeMark.vue'
 import AppTour from './AppTour.vue' // 渲染 overlay;通过 ref 调用 start()
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -138,8 +139,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       <SidebarHeader>
         <div class="flex items-center gap-2 py-1.5">
           <span
-            class="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg text-[13px] font-bold"
-          >AI</span>
+            class="bg-primary-soft text-primary ring-primary/15 flex aspect-square size-8 items-center justify-center rounded-lg ring-1"
+          >
+            <ClaudeMark class="size-5" />
+          </span>
           <div class="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
             <span class="truncate text-sm font-semibold">Open Platform</span>
             <span class="text-muted-foreground truncate text-xs">大模型聚合网关</span>
