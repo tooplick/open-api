@@ -23,6 +23,12 @@ public class User extends BaseEntity {
 
     private String email;
 
+    private Long githubId;
+
+    private String githubLogin;
+
+    private String avatarUrl;
+
     /** admin / user */
     private String role;
 

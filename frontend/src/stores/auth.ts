@@ -39,6 +39,11 @@ export const useAuthStore = defineStore('auth', () => {
     setSession(resp.token, resp.user)
   }
 
+  async function exchangeGithubTicket(ticket: string): Promise<void> {
+    const resp = await authApi.exchangeGithubTicket({ ticket })
+    setSession(resp.token, resp.user)
+  }
+
   /** 首次登录强制改账号密码后,用新 token + user 重置会话 */
   async function completeFirstLogin(username: string, newPassword: string): Promise<void> {
     const resp = await authApi.changeInitialCredentials({ username, newPassword })
@@ -56,5 +61,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(USER_KEY)
   }
 
-  return { token, user, isLoggedIn, isAdmin, login, completeFirstLogin, refreshMe, setUser, clear }
+  return { token, user, isLoggedIn, isAdmin, login, exchangeGithubTicket, completeFirstLogin, refreshMe, setUser, clear }
 })

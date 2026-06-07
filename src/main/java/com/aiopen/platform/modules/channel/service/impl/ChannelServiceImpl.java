@@ -2,6 +2,7 @@ package com.aiopen.platform.modules.channel.service.impl;
 
 import com.aiopen.platform.common.exception.BusinessException;
 import com.aiopen.platform.common.result.ResultCode;
+import com.aiopen.platform.config.OutboundHttpClientFactory;
 import com.aiopen.platform.modules.ability.service.AbilityService;
 import com.aiopen.platform.modules.channel.dto.ChannelRequest;
 import com.aiopen.platform.modules.channel.dto.FetchModelsRequest;
@@ -35,11 +36,7 @@ public class ChannelServiceImpl extends ServiceImpl<ChannelMapper, Channel> impl
 
     private final AbilityService abilityService;
     private final ObjectMapper objectMapper;
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .version(HttpClient.Version.HTTP_1_1)
-            .build();
+    private final OutboundHttpClientFactory httpClientFactory;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -118,7 +115,8 @@ public class ChannelServiceImpl extends ServiceImpl<ChannelMapper, Channel> impl
                     .header("Accept", "application/json")
                     .GET()
                     .build();
-            resp = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            resp = httpClientFactory.create(Duration.ofSeconds(10), HttpClient.Version.HTTP_1_1)
+                    .send(httpRequest, HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
             log.warn("拉取上游模型失败 url={}: {}", url, e.getMessage());
             throw new BusinessException(ResultCode.CHANNEL_REQUEST_FAILED, "连接上游失败: " + e.getMessage());

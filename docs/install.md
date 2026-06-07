@@ -146,6 +146,20 @@ npm run dev        # 开发服务器 http://localhost:5173
 
 Vite 已把 `/api`、`/v1`、`/anthropic` 反向代理到后端 `http://localhost:8321`(见 `vite.config.ts`),前端用相对路径请求,无需关心跨域。**请先启动后端。**
 
+若启用 GitHub OAuth 登录,GitHub OAuth App 的 Authorization callback URL 填后端地址:
+
+```text
+http://localhost:8321/api/auth/github/callback
+```
+
+本地 Vite 开发时,系统设置里的“前端回调地址”填:
+
+```text
+http://localhost:5173/oauth/github/callback
+```
+
+Docker 或生产同源部署时可留空,后端会默认重定向到同源 `/oauth/github/callback`。
+
 前端生产构建:
 
 ```bash

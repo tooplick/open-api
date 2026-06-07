@@ -74,6 +74,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
+    public User getByGithubId(Long githubId) {
+        if (githubId == null) {
+            return null;
+        }
+        return getOne(Wrappers.<User>lambdaQuery().eq(User::getGithubId, githubId), false);
+    }
+
+    @Override
     public void sendRegisterEmailCode(String email) {
         if (!settingService.isRegisterEnabled() || !settingService.isEmailRegisterEnabled()) {
             throw new BusinessException(ResultCode.REGISTER_DISABLED);

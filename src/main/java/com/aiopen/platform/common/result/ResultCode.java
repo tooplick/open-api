@@ -28,6 +28,8 @@ public enum ResultCode {
     EMAIL_CODE_TOO_FREQUENT(1009, "验证码发送过于频繁，请稍后再试"),
     EMAIL_SERVICE_NOT_CONFIGURED(1010, "邮件服务未配置，请联系管理员"),
     EMAIL_SEND_FAILED(1011, "邮件发送失败，请稍后重试"),
+    GITHUB_OAUTH_NOT_CONFIGURED(1012, "GitHub OAuth is not configured"),
+    GITHUB_OAUTH_FAILED(1013, "GitHub OAuth login failed"),
 
     // 额度相关 11xx
     QUOTA_INSUFFICIENT(1101, "额度不足"),

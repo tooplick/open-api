@@ -25,6 +25,7 @@ public class SystemSettingServiceImpl
 
     private static final String DEFAULT_GROUP = "default";
     private static final String SMTP_PASSWORD_MASK = "******";
+    private static final String GITHUB_CLIENT_SECRET_MASK = "******";
 
     @Override
     public String get(String key, String def) {
@@ -75,6 +76,13 @@ public class SystemSettingServiceImpl
         putIfAbsent(SettingKeys.REGISTER_PASSWORD, "true");
         putIfAbsent(SettingKeys.REGISTER_EMAIL, "false");
         putIfAbsent(SettingKeys.REGISTER_GITHUB, "false");
+        putIfAbsent(SettingKeys.GITHUB_CLIENT_ID, "");
+        putIfAbsent(SettingKeys.GITHUB_CLIENT_SECRET, "");
+        putIfAbsent(SettingKeys.GITHUB_REDIRECT_URI, "");
+        putIfAbsent(SettingKeys.GITHUB_FRONTEND_CALLBACK_URI, "");
+        putIfAbsent(SettingKeys.PROXY_ENABLED, "false");
+        putIfAbsent(SettingKeys.PROXY_HOST, "");
+        putIfAbsent(SettingKeys.PROXY_PORT, "7890");
         putIfAbsent(SettingKeys.SMTP_HOST, "");
         putIfAbsent(SettingKeys.SMTP_PORT, "587");
         putIfAbsent(SettingKeys.SMTP_USERNAME, "");
@@ -100,6 +108,14 @@ public class SystemSettingServiceImpl
         vo.setPasswordRegisterEnabled(getBool(SettingKeys.REGISTER_PASSWORD, true));
         vo.setEmailRegisterEnabled(getBool(SettingKeys.REGISTER_EMAIL, false));
         vo.setGithubRegisterEnabled(getBool(SettingKeys.REGISTER_GITHUB, false));
+        vo.setGithubClientId(get(SettingKeys.GITHUB_CLIENT_ID, ""));
+        String githubSecret = get(SettingKeys.GITHUB_CLIENT_SECRET, "");
+        vo.setGithubClientSecret(StringUtils.hasText(githubSecret) ? GITHUB_CLIENT_SECRET_MASK : "");
+        vo.setGithubRedirectUri(get(SettingKeys.GITHUB_REDIRECT_URI, ""));
+        vo.setGithubFrontendCallbackUri(get(SettingKeys.GITHUB_FRONTEND_CALLBACK_URI, ""));
+        vo.setProxyEnabled(getBool(SettingKeys.PROXY_ENABLED, false));
+        vo.setProxyHost(get(SettingKeys.PROXY_HOST, ""));
+        vo.setProxyPort(parseInt(get(SettingKeys.PROXY_PORT, "7890"), 7890));
         vo.setSmtpHost(get(SettingKeys.SMTP_HOST, ""));
         vo.setSmtpPort(parseInt(get(SettingKeys.SMTP_PORT, "587"), 587));
         vo.setSmtpUsername(get(SettingKeys.SMTP_USERNAME, ""));
@@ -143,6 +159,16 @@ public class SystemSettingServiceImpl
         put(SettingKeys.REGISTER_PASSWORD, String.valueOf(req.isPasswordRegisterEnabled()));
         put(SettingKeys.REGISTER_EMAIL, String.valueOf(req.isEmailRegisterEnabled()));
         put(SettingKeys.REGISTER_GITHUB, String.valueOf(req.isGithubRegisterEnabled()));
+        put(SettingKeys.GITHUB_CLIENT_ID, req.getGithubClientId());
+        String incomingGithubSecret = req.getGithubClientSecret();
+        if (StringUtils.hasText(incomingGithubSecret) && !GITHUB_CLIENT_SECRET_MASK.equals(incomingGithubSecret)) {
+            put(SettingKeys.GITHUB_CLIENT_SECRET, incomingGithubSecret);
+        }
+        put(SettingKeys.GITHUB_REDIRECT_URI, req.getGithubRedirectUri());
+        put(SettingKeys.GITHUB_FRONTEND_CALLBACK_URI, req.getGithubFrontendCallbackUri());
+        put(SettingKeys.PROXY_ENABLED, String.valueOf(req.isProxyEnabled()));
+        put(SettingKeys.PROXY_HOST, req.getProxyHost());
+        put(SettingKeys.PROXY_PORT, String.valueOf(req.getProxyPort() == null ? 7890 : req.getProxyPort()));
         put(SettingKeys.SMTP_HOST, req.getSmtpHost());
         put(SettingKeys.SMTP_PORT, String.valueOf(req.getSmtpPort() == null ? 587 : req.getSmtpPort()));
         put(SettingKeys.SMTP_USERNAME, req.getSmtpUsername());
@@ -167,6 +193,11 @@ public class SystemSettingServiceImpl
     @Override
     public boolean isEmailRegisterEnabled() {
         return getBool(SettingKeys.REGISTER_EMAIL, false);
+    }
+
+    @Override
+    public boolean isGithubRegisterEnabled() {
+        return getBool(SettingKeys.REGISTER_GITHUB, false);
     }
 
     private int parseInt(String v, int def) {

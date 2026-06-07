@@ -22,8 +22,18 @@ public final class SettingKeys {
     public static final String REGISTER_PASSWORD = "register.password.enabled";
     /** 邮箱验证码注册(实现见后续阶段) */
     public static final String REGISTER_EMAIL = "register.email.enabled";
-    /** GitHub OAuth 注册(实现见后续阶段) */
+    /** GitHub OAuth 登录/注册 */
     public static final String REGISTER_GITHUB = "register.github.enabled";
+
+    public static final String GITHUB_CLIENT_ID = "github.oauth.client_id";
+    public static final String GITHUB_CLIENT_SECRET = "github.oauth.client_secret";
+    public static final String GITHUB_REDIRECT_URI = "github.oauth.redirect_uri";
+    public static final String GITHUB_FRONTEND_CALLBACK_URI = "github.oauth.frontend_callback_uri";
+
+    /** 后端出站 HTTP 代理,用于 GitHub OAuth、上游模型请求、拉取模型列表等 */
+    public static final String PROXY_ENABLED = "proxy.enabled";
+    public static final String PROXY_HOST = "proxy.host";
+    public static final String PROXY_PORT = "proxy.port";
 
     // SMTP 邮件服务(邮箱验证码注册用)
     public static final String SMTP_HOST = "smtp.host";

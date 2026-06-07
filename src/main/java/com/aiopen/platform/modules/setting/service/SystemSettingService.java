@@ -33,4 +33,6 @@ public interface SystemSettingService extends IService<SystemSetting> {
 
     /** 是否开放邮箱验证码注册 */
     boolean isEmailRegisterEnabled();
+
+    boolean isGithubRegisterEnabled();
 }

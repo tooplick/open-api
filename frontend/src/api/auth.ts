@@ -1,8 +1,16 @@
-import { post, put } from './http'
-import type { EmailRegisterRequest, LoginRequest, LoginResponse, RegisterRequest, SendEmailCodeRequest, User } from '@/types'
+import { get, post, put } from './http'
+import type { EmailRegisterRequest, GithubAuthorizeResponse, GithubTicketExchangeRequest, LoginRequest, LoginResponse, RegisterRequest, SendEmailCodeRequest, User } from '@/types'
 
 export function login(body: LoginRequest) {
   return post<LoginResponse>('/api/auth/login', body)
+}
+
+export function getGithubAuthorizeUrl(redirect?: string) {
+  return get<GithubAuthorizeResponse>('/api/auth/github/authorize-url', { redirect })
+}
+
+export function exchangeGithubTicket(body: GithubTicketExchangeRequest) {
+  return post<LoginResponse>('/api/auth/github/exchange', body)
 }
 
 export function register(body: RegisterRequest) {

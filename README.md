@@ -46,6 +46,7 @@ docker compose up -d --build
 | 文档 | 内容 |
 | --- | --- |
 | [install.md](/docs/install.md) | 安装与运行(Docker / 手动部署) |
+| [config.md](/docs/config.md) | 控制台配置说明:邮箱验证码注册 / GitHub OAuth 登录 |
 | [api.md](/docs/api.md) | 接口列表、鉴权与响应约定、curl 与 SDK 用法 |
 | [TODO.md](/docs/TODO.md) | 待办事项与功能规划 |
 

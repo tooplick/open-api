@@ -16,6 +16,8 @@ public interface UserService extends IService<User> {
 
     User getByEmail(String email);
 
+    User getByGithubId(Long githubId);
+
     /** 发送注册邮箱验证码(含门控、邮箱查重、发送冷却) */
     void sendRegisterEmailCode(String email);
 

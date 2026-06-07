@@ -25,6 +25,9 @@ export interface User {
   id: number
   username: string
   email?: string | null
+  githubId?: number | null
+  githubLogin?: string | null
+  avatarUrl?: string | null
   /** admin / user */
   role: string
   /** 1 启用 0 禁用 */
@@ -60,6 +63,14 @@ export interface EmailRegisterRequest {
 export interface LoginResponse {
   token: string
   user: User
+}
+
+export interface GithubAuthorizeResponse {
+  url: string
+}
+
+export interface GithubTicketExchangeRequest {
+  ticket: string
 }
 
 export interface ChangePasswordRequest {
@@ -199,6 +210,13 @@ export interface Settings {
   passwordRegisterEnabled: boolean
   emailRegisterEnabled: boolean
   githubRegisterEnabled: boolean
+  githubClientId: string
+  githubClientSecret: string
+  githubRedirectUri: string
+  githubFrontendCallbackUri: string
+  proxyEnabled: boolean
+  proxyHost: string
+  proxyPort: number
   smtpHost: string
   smtpPort: number
   smtpUsername: string

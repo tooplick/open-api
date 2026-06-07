@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: '/oauth/github/callback',
+    name: 'oauth-github-callback',
+    component: () => import('@/views/OAuthCallbackView.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/first-login',
     name: 'first-login',
     component: () => import('@/views/FirstLoginView.vue'),

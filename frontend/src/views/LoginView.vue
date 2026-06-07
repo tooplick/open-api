@@ -5,7 +5,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
-import { emailRegister, register as registerApi, sendEmailCode } from '@/api/auth'
+import { emailRegister, getGithubAuthorizeUrl, register as registerApi, sendEmailCode } from '@/api/auth'
 import { getPublicSettings } from '@/api/setting'
 import type { PublicSettings } from '@/types'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import GithubMark from '@/components/icons/GithubMark.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -37,8 +38,10 @@ const pub = reactive<PublicSettings>({
 
 const showRegister = computed(() => pub.registerEnabled && (pub.passwordRegisterEnabled || pub.emailRegisterEnabled))
 const bothRegister = computed(() => pub.passwordRegisterEnabled && pub.emailRegisterEnabled)
+const githubLoginEnabled = computed(() => pub.githubRegisterEnabled)
 
 const sending = ref(false)
+const githubLoading = ref(false)
 const countdown = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -90,6 +93,21 @@ async function onLogin(values: any): Promise<void> {
   }
   catch {
     // 错误提示已由 axios 拦截器统一弹出
+  }
+}
+
+async function onGithubLogin(): Promise<void> {
+  githubLoading.value = true
+  try {
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard'
+    const resp = await getGithubAuthorizeUrl(redirect)
+    window.location.href = resp.url
+  }
+  catch {
+    // 鎷︽埅鍣ㄥ凡鎻愮ず
+  }
+  finally {
+    githubLoading.value = false
   }
 }
 
@@ -227,6 +245,19 @@ async function onEmailRegister(values: any): Promise<void> {
                 登录
               </Button>
             </Form>
+            <div v-if="githubLoginEnabled" class="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                class="w-full"
+                :disabled="githubLoading"
+                @click="onGithubLogin"
+              >
+                <Spinner v-if="githubLoading" />
+                <GithubMark v-else class="size-4" />
+                GitHub
+              </Button>
+            </div>
           </TabsContent>
 
           <TabsContent v-if="showRegister" value="register">

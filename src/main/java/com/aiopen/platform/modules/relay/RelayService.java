@@ -1,5 +1,6 @@
 package com.aiopen.platform.modules.relay;
 
+import com.aiopen.platform.config.OutboundHttpClientFactory;
 import com.aiopen.platform.modules.channel.entity.Channel;
 import com.aiopen.platform.modules.channel.service.ChannelService;
 import com.aiopen.platform.modules.log.entity.Log;
@@ -52,11 +53,7 @@ public class RelayService {
     private final LogService logService;
     private final AdaptorFactory adaptorFactory;
     private final ObjectMapper objectMapper;
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(30))
-            .version(HttpClient.Version.HTTP_1_1)
-            .build();
+    private final OutboundHttpClientFactory httpClientFactory;
 
     public void relayChat(HttpServletRequest request, HttpServletResponse response) throws IOException {
         long start = System.currentTimeMillis();
@@ -238,7 +235,8 @@ public class RelayService {
 
     private <T> HttpResponse<T> send(HttpRequest req, HttpResponse.BodyHandler<T> handler) throws IOException {
         try {
-            return httpClient.send(req, handler);
+            return httpClientFactory.create(Duration.ofSeconds(30), HttpClient.Version.HTTP_1_1)
+                    .send(req, handler);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("上游请求被中断", e);

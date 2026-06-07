@@ -20,6 +20,9 @@ CREATE TABLE `user`
     `username`    VARCHAR(50)  NOT NULL COMMENT '用户名',
     `password`    VARCHAR(100) NOT NULL COMMENT '密码(BCrypt)',
     `email`       VARCHAR(100) DEFAULT NULL COMMENT '邮箱',
+    `github_id`   BIGINT       DEFAULT NULL COMMENT 'GitHub user id',
+    `github_login` VARCHAR(100) DEFAULT NULL COMMENT 'GitHub login',
+    `avatar_url`  VARCHAR(500) DEFAULT NULL COMMENT 'Avatar URL',
     `role`        VARCHAR(20)  NOT NULL DEFAULT 'user' COMMENT '角色: admin / user',
     `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0禁用',
     `must_change_password` TINYINT NOT NULL DEFAULT 0 COMMENT '1需首次登录强制改账号密码 0否',
@@ -28,6 +31,7 @@ CREATE TABLE `user`
     `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0未删 1已删',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_username` (`username`),
+    UNIQUE KEY `uk_github_id` (`github_id`),
     KEY `idx_email` (`email`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='用户表';
@@ -161,5 +165,8 @@ CREATE TABLE `system_setting`
 -- 老库升级说明(本仓库无迁移脚本;schema.sql 为 DROP+CREATE 全量脚本,老库切勿重跑整脚本以免丢数据)
 -- 邮箱验证码注册:为 user.email 增加普通索引以加速查重(全新库已含,老库仅执行下面一行):
 --   ALTER TABLE `user` ADD KEY `idx_email` (`email`);
+-- GitHub OAuth login adds user identity columns; existing DBs should run:
+--   ALTER TABLE `user` ADD COLUMN `github_id` BIGINT DEFAULT NULL COMMENT 'GitHub user id', ADD COLUMN `github_login` VARCHAR(100) DEFAULT NULL COMMENT 'GitHub login', ADD COLUMN `avatar_url` VARCHAR(500) DEFAULT NULL COMMENT 'Avatar URL', ADD UNIQUE KEY `uk_github_id` (`github_id`);
+-- GitHub OAuth Client ID/Secret/callback URIs are system_setting keys filled by SettingInitializer.
 -- SMTP 邮件服务配置走 system_setting 键值表, 由 SettingInitializer 启动补默认项, 无需建表/改表
 -- ---------------------------

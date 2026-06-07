@@ -119,6 +119,13 @@ const form = reactive<Settings>({
   passwordRegisterEnabled: true,
   emailRegisterEnabled: false,
   githubRegisterEnabled: false,
+  githubClientId: '',
+  githubClientSecret: '',
+  githubRedirectUri: '',
+  githubFrontendCallbackUri: '',
+  proxyEnabled: false,
+  proxyHost: '',
+  proxyPort: 7890,
   smtpHost: '',
   smtpPort: 587,
   smtpUsername: '',
@@ -275,13 +282,43 @@ onMounted(() => void load())
           <div class="flex items-center justify-between py-3.5">
             <div>
               <div class="text-sm font-medium">
-                GitHub 注册
+                GitHub 登录/注册
               </div>
               <div class="text-muted-foreground text-xs">
-                需配置 OAuth 应用,具体实现见后续版本
+                配置 OAuth 应用后在登录页显示 GitHub 入口
               </div>
             </div>
             <Switch v-model="form.githubRegisterEnabled" :disabled="!form.registerEnabled" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>GitHub OAuth</CardTitle>
+          <CardDescription>GitHub OAuth App 参数,Client Secret 仅保存不回显</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div class="space-y-1.5">
+            <Label>Client ID</Label>
+            <Input v-model="form.githubClientId" placeholder="GitHub OAuth App Client ID" autocomplete="off" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>Client Secret</Label>
+            <Input
+              v-model="form.githubClientSecret"
+              type="password"
+              placeholder="留空表示不修改"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <Label>后端回调地址</Label>
+            <Input v-model="form.githubRedirectUri" placeholder="http://localhost:8321/api/auth/github/callback" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>前端回调地址</Label>
+            <Input v-model="form.githubFrontendCallbackUri" placeholder="http://localhost:5173/oauth/github/callback" />
           </div>
         </CardContent>
       </Card>
@@ -327,6 +364,43 @@ onMounted(() => void load())
               </div>
             </div>
             <Switch v-model="form.smtpSslEnabled" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>系统代理</CardTitle>
+          <CardDescription>后端访问 GitHub OAuth、上游模型接口和拉取模型列表时使用</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div class="flex items-center justify-between pt-1">
+            <div>
+              <div class="text-sm font-medium">
+                启用出站 HTTP 代理
+              </div>
+              <div class="text-muted-foreground text-xs">
+                只影响后端发起的外部 HTTP 请求
+              </div>
+            </div>
+            <Switch v-model="form.proxyEnabled" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>代理 Host</Label>
+            <Input
+                v-model="form.proxyHost"
+                :disabled="!form.proxyEnabled"
+                placeholder="本机运行填 127.0.0.1;Docker 填 host.docker.internal"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <Label>代理端口</Label>
+            <Input
+                v-model.number="form.proxyPort"
+                :disabled="!form.proxyEnabled"
+                type="number"
+                placeholder="7890"
+            />
           </div>
         </CardContent>
       </Card>

@@ -57,7 +57,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register",
-                                "/api/auth/email-code", "/api/auth/email-register").permitAll()
+                                "/api/auth/email-code", "/api/auth/email-register",
+                                "/api/auth/github/**").permitAll()
                         .requestMatchers("/api/settings/public").permitAll()
                         .requestMatchers("/v1/**", "/anthropic/**").permitAll()
                         .requestMatchers("/api/**").authenticated()

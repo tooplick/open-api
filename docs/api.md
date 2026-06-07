@@ -13,7 +13,7 @@
 
 ### 控制台接口(`/api/**`)
 
-- **鉴权**:先登录拿 JWT,后续请求带 `Authorization: Bearer <jwt>`;仅 `/api/auth/login`、`/api/auth/register`、`/api/auth/email-code`、`/api/auth/email-register` 公开。登录由 Spring Security 的 `AuthenticationManager` 认证,管理员接口用方法级 `@PreAuthorize("hasRole('ADMIN')")` 鉴权。
+- **鉴权**:先登录拿 JWT,后续请求带 `Authorization: Bearer <jwt>`;仅 `/api/auth/login`、`/api/auth/register`、`/api/auth/email-code`、`/api/auth/email-register`、`/api/auth/github/**` 公开。登录由 Spring Security 的 `AuthenticationManager` 认证,管理员接口用方法级 `@PreAuthorize("hasRole('ADMIN')")` 鉴权。
 - **响应**:统一结构
 
   ```json
@@ -41,6 +41,9 @@
 | POST | `/api/auth/email-code` | 发送注册邮箱验证码 | 公开 |
 | POST | `/api/auth/email-register` | 邮箱验证码注册 | 公开 |
 | POST | `/api/auth/login` | 登录,返回 `{ token, user }` | 公开 |
+| GET | `/api/auth/github/authorize-url` | 获取 GitHub OAuth 授权地址(`?redirect=/dashboard`) | 公开 |
+| GET | `/api/auth/github/callback` | GitHub OAuth 后端回调,成功后重定向到前端回调页 | 公开 |
+| POST | `/api/auth/github/exchange` | 使用一次性 ticket 换 `{ token, user }` | 公开 |
 | GET | `/api/user/me` | 当前登录用户信息 | 登录 |
 | PUT | `/api/user/password` | 修改自己的密码 | 登录 |
 | GET | `/api/user/page` | 用户分页(`?current&size&username`) | 管理员 |
@@ -82,6 +85,30 @@ curl -X POST http://localhost:8321/api/auth/email-register \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"secret123","email":"user@example.com","code":"123456"}'
 ```
+
+### GitHub OAuth 登录
+
+GitHub 登录属于控制台 `/api/**` 的 JWT 鉴权域。前端不接触 GitHub Client Secret;后端完成 OAuth code exchange 后生成一次性 ticket,前端再用 ticket 换现有 `LoginResponse`。
+
+管理员需先在“系统设置”启用 GitHub 登录/注册并配置 OAuth App:
+
+- GitHub OAuth App Authorization callback URL: `http://localhost:8321/api/auth/github/callback`(Docker/生产同源时替换为实际域名)
+- 本地 Vite 开发时,前端回调地址填 `http://localhost:5173/oauth/github/callback`
+- Docker/生产同源部署时,前端回调地址可留空,默认使用同源 `/oauth/github/callback`
+
+流程:
+
+1. 前端调用 `GET /api/auth/github/authorize-url?redirect=/dashboard`,返回 `{ "url": "https://github.com/login/oauth/authorize?..." }`。
+2. 浏览器跳转到该 URL,GitHub 回调 `GET /api/auth/github/callback?code=...&state=...`。
+3. 后端重定向到 `/oauth/github/callback?ticket=...&redirect=...`;前端调用 `POST /api/auth/github/exchange`:
+
+```bash
+curl -X POST http://localhost:8321/api/auth/github/exchange \
+  -H "Content-Type: application/json" \
+  -d '{"ticket":"one-time-ticket"}'
+```
+
+首次 GitHub 登录会创建普通 `user` 账号;本地密码字段仍为不可知随机 BCrypt 密文,不会暴露给用户。既有 GitHub 账号再次登录会按 `github_id` 命中同一用户。
 
 ## 转发接口(OpenAI 兼容,`/v1/**`)
 
