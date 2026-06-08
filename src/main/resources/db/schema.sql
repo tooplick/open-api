@@ -156,6 +156,30 @@ CREATE TABLE `system_setting`
   DEFAULT CHARSET = utf8mb4 COMMENT ='系统设置表';
 
 -- ---------------------------
+-- 用户活动日志表(登录/注册/操作审计;不做逻辑删除,无 deleted 字段)
+-- ---------------------------
+DROP TABLE IF EXISTS `user_activity_log`;
+CREATE TABLE `user_activity_log`
+(
+    `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id`         BIGINT       DEFAULT NULL COMMENT '操作用户ID',
+    `username`        VARCHAR(50)  DEFAULT NULL COMMENT '用户名(冗余)',
+    `action`          VARCHAR(50)  NOT NULL COMMENT '操作类型',
+    `resource_type`   VARCHAR(50)  DEFAULT NULL COMMENT '资源类型: USER/API_KEY/CHANNEL/SETTING',
+    `resource_id`     BIGINT       DEFAULT NULL COMMENT '资源ID',
+    `resource_name`   VARCHAR(200) DEFAULT NULL COMMENT '资源名称(冗余)',
+    `detail`          VARCHAR(500) DEFAULT NULL COMMENT '补充说明',
+    `ip`              VARCHAR(64)  DEFAULT NULL COMMENT '客户端IP',
+    `user_agent`      VARCHAR(255) DEFAULT NULL COMMENT '客户端User-Agent',
+    `status`          TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1成功 2失败',
+    `create_time`     DATETIME     DEFAULT NULL COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_action` (`action`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT ='用户活动日志表';
+
+-- ---------------------------
 -- 管理员账号由应用启动时自动创建(见 DataInitializer): admin / admin
 -- 系统设置默认项由应用启动时补齐(见 SettingInitializer)
 -- 模型不再手动维护, 由各渠道的 models 字段聚合得到
@@ -169,4 +193,6 @@ CREATE TABLE `system_setting`
 --   ALTER TABLE `user` ADD COLUMN `github_id` BIGINT DEFAULT NULL COMMENT 'GitHub user id', ADD COLUMN `github_login` VARCHAR(100) DEFAULT NULL COMMENT 'GitHub login', ADD COLUMN `avatar_url` VARCHAR(500) DEFAULT NULL COMMENT 'Avatar URL', ADD UNIQUE KEY `uk_github_id` (`github_id`);
 -- GitHub OAuth Client ID/Secret/callback URIs are system_setting keys filled by SettingInitializer.
 -- SMTP 邮件服务配置走 system_setting 键值表, 由 SettingInitializer 启动补默认项, 无需建表/改表
+-- 用户活动日志(登录/操作审计): 老库执行以下建表语句:
+--   CREATE TABLE `user_activity_log` ( ... 见上方 ... );
 -- ---------------------------

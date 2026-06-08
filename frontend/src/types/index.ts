@@ -198,6 +198,23 @@ export interface DailyStat {
   totalTokens: number
 }
 
+// ---------- 用户活动日志 ----------
+export interface ActivityLogItem {
+  id: number
+  userId: number
+  username: string
+  action: string
+  resourceType?: string
+  resourceId?: number
+  resourceName?: string
+  detail?: string
+  ip?: string
+  userAgent?: string
+  /** 1 成功 2 失败 */
+  status: number
+  createTime?: string
+}
+
 // ---------- 系统设置 ----------
 export interface Settings {
   siteName: string
