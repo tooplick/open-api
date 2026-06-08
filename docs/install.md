@@ -28,14 +28,6 @@ clone 仓库(需要 `docker-compose.yml` 和 `schema.sql`):
 git clone https://github.com/tooplick/open-api.git && cd open-api
 ```
 
-编辑 `docker-compose.yml` 中 `app` 服务的 `image` 字段,移除 `build` 配置,改为使用预构建镜像:
-
-```yaml
-  app:
-    image: tooplick/open-api:latest
-    # 移除 build: 配置块
-```
-
 然后启动:
 
 ```bash
