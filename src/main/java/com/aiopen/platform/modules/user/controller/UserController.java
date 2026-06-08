@@ -2,6 +2,8 @@ package com.aiopen.platform.modules.user.controller;
 
 import com.aiopen.platform.common.result.PageResult;
 import com.aiopen.platform.common.result.Result;
+import com.aiopen.platform.modules.activitylog.entity.UserActivityLog;
+import com.aiopen.platform.modules.activitylog.service.UserActivityLogService;
 import com.aiopen.platform.modules.user.dto.ChangePasswordRequest;
 import com.aiopen.platform.modules.user.dto.InitialCredentialsRequest;
 import com.aiopen.platform.modules.user.dto.LoginResponse;
@@ -11,6 +13,7 @@ import com.aiopen.platform.modules.user.service.UserService;
 import com.aiopen.platform.security.AuthUser;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +28,8 @@ public class UserController {
 
     private final UserService userService;
     private final AuthService authService;
+    private final UserActivityLogService activityLogService;
+    private final HttpServletRequest servletRequest;
 
     /** 当前登录用户信息 */
     @GetMapping("/me")
@@ -63,11 +68,26 @@ public class UserController {
     /** 管理员:启用/禁用用户 */
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
+    public Result<Void> updateStatus(@AuthenticationPrincipal AuthUser principal,
+                                     @PathVariable Long id, @RequestParam Integer status) {
+        User target = userService.getById(id);
+        String targetName = target != null ? target.getUsername() : String.valueOf(id);
         User update = new User();
         update.setId(id);
         update.setStatus(status);
         userService.updateById(update);
+        UserActivityLog log = new UserActivityLog();
+        log.setUserId(principal.getId());
+        log.setUsername(principal.getUsername());
+        log.setAction("USER_STATUS_CHANGE");
+        log.setResourceType("USER");
+        log.setResourceId(id);
+        log.setResourceName(targetName);
+        log.setDetail("状态变更为 " + (status == 1 ? "启用" : "禁用"));
+        log.setIp(servletRequest.getRemoteAddr());
+        log.setUserAgent(servletRequest.getHeader("User-Agent"));
+        log.setStatus(1);
+        activityLogService.record(log);
         return Result.success();
     }
 }

@@ -4,6 +4,8 @@ import com.aiopen.platform.common.exception.BusinessException;
 import com.aiopen.platform.common.result.ResultCode;
 import com.aiopen.platform.config.OutboundHttpClientFactory;
 import com.aiopen.platform.modules.ability.service.AbilityService;
+import com.aiopen.platform.modules.activitylog.entity.UserActivityLog;
+import com.aiopen.platform.modules.activitylog.service.UserActivityLogService;
 import com.aiopen.platform.modules.channel.dto.ChannelRequest;
 import com.aiopen.platform.modules.channel.dto.FetchModelsRequest;
 import com.aiopen.platform.modules.channel.entity.Channel;
@@ -12,6 +14,7 @@ import com.aiopen.platform.modules.channel.service.ChannelService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -37,6 +40,8 @@ public class ChannelServiceImpl extends ServiceImpl<ChannelMapper, Channel> impl
     private final AbilityService abilityService;
     private final ObjectMapper objectMapper;
     private final OutboundHttpClientFactory httpClientFactory;
+    private final UserActivityLogService activityLogService;
+    private final HttpServletRequest servletRequest;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -48,6 +53,7 @@ public class ChannelServiceImpl extends ServiceImpl<ChannelMapper, Channel> impl
         BeanUtils.copyProperties(request, channel);
         save(channel);
         abilityService.rebuildForChannel(channel);
+        recordActivity("CHANNEL_CREATE", "CHANNEL", channel.getId(), channel.getName(), "创建渠道", 1);
         return channel;
     }
 
@@ -70,6 +76,7 @@ public class ChannelServiceImpl extends ServiceImpl<ChannelMapper, Channel> impl
         }
         updateById(channel);
         abilityService.rebuildForChannel(getById(id));
+        recordActivity("CHANNEL_UPDATE", "CHANNEL", id, request.getName(), "更新渠道", 1);
     }
 
     @Override
@@ -80,13 +87,18 @@ public class ChannelServiceImpl extends ServiceImpl<ChannelMapper, Channel> impl
         channel.setStatus(status);
         updateById(channel);
         abilityService.rebuildForChannel(getById(id));
+        recordActivity("CHANNEL_STATUS_CHANGE", "CHANNEL", id, null,
+                "状态变更为 " + (status == 1 ? "启用" : "禁用"), 1);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteChannel(Long id) {
+        Channel existing = getById(id);
+        String name = existing != null ? existing.getName() : null;
         removeById(id);
         abilityService.deleteForChannel(id);
+        recordActivity("CHANNEL_DELETE", "CHANNEL", id, name, "删除渠道", 1);
     }
 
     @Override
@@ -168,5 +180,19 @@ public class ChannelServiceImpl extends ServiceImpl<ChannelMapper, Channel> impl
         } catch (Exception e) {
             throw new BusinessException(ResultCode.CHANNEL_REQUEST_FAILED, "解析上游模型列表失败");
         }
+    }
+
+    private void recordActivity(String action, String resourceType, Long resourceId,
+                                String resourceName, String detail, int status) {
+        UserActivityLog log = new UserActivityLog();
+        log.setAction(action);
+        log.setResourceType(resourceType);
+        log.setResourceId(resourceId);
+        log.setResourceName(resourceName);
+        log.setDetail(detail);
+        log.setIp(servletRequest.getRemoteAddr());
+        log.setUserAgent(servletRequest.getHeader("User-Agent"));
+        log.setStatus(status);
+        activityLogService.record(log);
     }
 }

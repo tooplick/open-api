@@ -2,6 +2,8 @@ package com.aiopen.platform.modules.setting.service.impl;
 
 import com.aiopen.platform.common.exception.BusinessException;
 import com.aiopen.platform.common.result.ResultCode;
+import com.aiopen.platform.modules.activitylog.entity.UserActivityLog;
+import com.aiopen.platform.modules.activitylog.service.UserActivityLogService;
 import com.aiopen.platform.modules.setting.SettingKeys;
 import com.aiopen.platform.modules.setting.dto.PublicSettingsVO;
 import com.aiopen.platform.modules.setting.dto.SettingsVO;
@@ -10,6 +12,9 @@ import com.aiopen.platform.modules.setting.mapper.SystemSettingMapper;
 import com.aiopen.platform.modules.setting.service.SystemSettingService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -19,9 +24,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class SystemSettingServiceImpl
         extends ServiceImpl<SystemSettingMapper, SystemSetting>
         implements SystemSettingService {
+
+    @Lazy
+    private final UserActivityLogService activityLogService;
+    private final HttpServletRequest servletRequest;
 
     private static final String DEFAULT_GROUP = "default";
     private static final String SMTP_PASSWORD_MASK = "******";
@@ -178,6 +188,7 @@ public class SystemSettingServiceImpl
         }
         put(SettingKeys.SMTP_FROM, req.getSmtpFrom());
         put(SettingKeys.SMTP_SSL_ENABLED, String.valueOf(req.isSmtpSslEnabled()));
+        recordActivity("SETTING_UPDATE", "SETTING", null, null, "更新系统设置", 1);
     }
 
     @Override
@@ -241,5 +252,19 @@ public class SystemSettingServiceImpl
     }
 
     private record KeyGroupConfig(String defaultGroup, String groups) {
+    }
+
+    private void recordActivity(String action, String resourceType, Long resourceId,
+                                String resourceName, String detail, int status) {
+        UserActivityLog log = new UserActivityLog();
+        log.setAction(action);
+        log.setResourceType(resourceType);
+        log.setResourceId(resourceId);
+        log.setResourceName(resourceName);
+        log.setDetail(detail);
+        log.setIp(servletRequest.getRemoteAddr());
+        log.setUserAgent(servletRequest.getHeader("User-Agent"));
+        log.setStatus(status);
+        activityLogService.record(log);
     }
 }

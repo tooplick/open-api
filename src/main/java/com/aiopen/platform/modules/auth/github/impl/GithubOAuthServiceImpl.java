@@ -3,6 +3,8 @@ package com.aiopen.platform.modules.auth.github.impl;
 import com.aiopen.platform.common.exception.BusinessException;
 import com.aiopen.platform.common.result.ResultCode;
 import com.aiopen.platform.config.OutboundHttpClientFactory;
+import com.aiopen.platform.modules.activitylog.entity.UserActivityLog;
+import com.aiopen.platform.modules.activitylog.service.UserActivityLogService;
 import com.aiopen.platform.modules.auth.github.GithubOAuthService;
 import com.aiopen.platform.modules.auth.github.GithubOAuthSessionStore;
 import com.aiopen.platform.modules.setting.SettingKeys;
@@ -53,6 +55,7 @@ public class GithubOAuthServiceImpl implements GithubOAuthService {
     private final ObjectMapper objectMapper;
     private final GithubOAuthSessionStore sessionStore;
     private final OutboundHttpClientFactory httpClientFactory;
+    private final UserActivityLogService activityLogService;
 
     @Override
     public GithubAuthorizeResponse buildAuthorizeUrl(String redirect, HttpServletRequest request) {
@@ -131,11 +134,13 @@ public class GithubOAuthServiceImpl implements GithubOAuthService {
 
     protected LoginResponse loginOrRegister(GithubProfile profile) {
         User user = userService.getByGithubId(profile.id());
+        boolean isNewUser = false;
         if (user == null) {
             if (!settingService.isRegisterEnabled()) {
                 throw new BusinessException(ResultCode.REGISTER_DISABLED);
             }
             user = createGithubUser(profile);
+            isNewUser = true;
         } else {
             user = updateGithubProfile(user, profile);
         }
@@ -144,6 +149,10 @@ public class GithubOAuthServiceImpl implements GithubOAuthService {
             throw new BusinessException(ResultCode.ACCOUNT_DISABLED);
         }
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
+        recordActivity(user.getId(), user.getUsername(),
+                isNewUser ? "REGISTER_GITHUB" : "LOGIN", "USER",
+                user.getId(), user.getUsername(),
+                isNewUser ? "GitHub OAuth 注册" : "GitHub OAuth 登录", 1);
         return new LoginResponse(token, user);
     }
 
@@ -268,6 +277,20 @@ public class GithubOAuthServiceImpl implements GithubOAuthService {
                     "GitHub API request failed, status " + response.statusCode());
         }
         return objectMapper.readTree(response.body());
+    }
+
+    private void recordActivity(Long userId, String username, String action, String resourceType,
+                                Long resourceId, String resourceName, String detail, int status) {
+        UserActivityLog log = new UserActivityLog();
+        log.setUserId(userId);
+        log.setUsername(username);
+        log.setAction(action);
+        log.setResourceType(resourceType);
+        log.setResourceId(resourceId);
+        log.setResourceName(resourceName);
+        log.setDetail(detail);
+        log.setStatus(status);
+        activityLogService.record(log);
     }
 
     private void ensureEnabledAndConfigured(GithubOAuthConfig config) {

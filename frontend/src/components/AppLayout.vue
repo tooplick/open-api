@@ -13,6 +13,7 @@ import {
   NetworkIcon,
   ScrollTextIcon,
   SearchIcon,
+  ShieldCheckIcon,
   SettingsIcon,
   UsersIcon,
 } from '@lucide/vue'
@@ -83,6 +84,7 @@ const nav: NavItem[] = [
   { name: 'channels', label: '渠道管理', icon: NetworkIcon, admin: true },
   { name: 'users', label: '用户管理', icon: UsersIcon, admin: true },
   { name: 'logs', label: '调用日志', icon: ScrollTextIcon },
+  { name: 'activity-logs', label: '操作日志', icon: ShieldCheckIcon, admin: true },
   { name: 'profile', label: '个人资料', icon: CircleUserIcon },
   { name: 'settings', label: '系统设置', icon: SettingsIcon, admin: true },
 ]
