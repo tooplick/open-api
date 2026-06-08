@@ -23,9 +23,10 @@ services:
 
   # 前后端合并:同一镜像里 Spring Boot 既出 Vue 页面又处理 API
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: tooplick/open-api:latest
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     container_name: aiopen-app
     restart: unless-stopped
     depends_on:
