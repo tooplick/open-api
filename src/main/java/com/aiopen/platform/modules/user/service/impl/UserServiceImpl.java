@@ -2,6 +2,8 @@ package com.aiopen.platform.modules.user.service.impl;
 
 import com.aiopen.platform.common.exception.BusinessException;
 import com.aiopen.platform.common.result.ResultCode;
+import com.aiopen.platform.modules.activitylog.entity.UserActivityLog;
+import com.aiopen.platform.modules.activitylog.service.UserActivityLogService;
 import com.aiopen.platform.modules.auth.email.EmailService;
 import com.aiopen.platform.modules.auth.email.VerificationCodeStore;
 import com.aiopen.platform.modules.setting.service.SystemSettingService;
@@ -14,6 +16,7 @@ import com.aiopen.platform.modules.user.service.UserService;
 import com.aiopen.platform.security.Roles;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final SystemSettingService settingService;
     private final VerificationCodeStore verificationCodeStore;
     private final EmailService emailService;
+    private final UserActivityLogService activityLogService;
+    private final HttpServletRequest servletRequest;
 
     @Override
     public User register(RegisterRequest request) {
@@ -45,6 +50,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setRole(Roles.USER);
         user.setStatus(1);
         save(user);
+        recordActivity(user.getId(), user.getUsername(), "REGISTER", "USER",
+                user.getId(), user.getUsername(), "密码注册", 1);
         return user;
     }
 
@@ -61,6 +68,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         update.setId(userId);
         update.setPassword(passwordEncoder.encode(request.getNewPassword()));
         updateById(update);
+        recordActivity(userId, user.getUsername(), "PASSWORD_CHANGE", "USER",
+                userId, user.getUsername(), "修改密码", 1);
     }
 
     @Override
@@ -120,6 +129,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setRole(Roles.USER);
         user.setStatus(1);
         save(user);
+        recordActivity(user.getId(), user.getUsername(), "REGISTER_EMAIL", "USER",
+                user.getId(), user.getUsername(), "邮箱验证码注册", 1);
         return user;
+    }
+
+    private void recordActivity(Long userId, String username, String action, String resourceType,
+                                Long resourceId, String resourceName, String detail, int status) {
+        UserActivityLog log = new UserActivityLog();
+        log.setUserId(userId);
+        log.setUsername(username);
+        log.setAction(action);
+        log.setResourceType(resourceType);
+        log.setResourceId(resourceId);
+        log.setResourceName(resourceName);
+        log.setDetail(detail);
+        log.setIp(getClientIp());
+        log.setUserAgent(servletRequest.getHeader("User-Agent"));
+        log.setStatus(status);
+        activityLogService.record(log);
+    }
+
+    private String getClientIp() {
+        String ip = servletRequest.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isEmpty()) {
+            ip = ip.split(",")[0].trim();
+        }
+        if (ip == null || ip.isEmpty()) {
+            ip = servletRequest.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty()) {
+            ip = servletRequest.getRemoteAddr();
+        }
+        return ip;
     }
 }
