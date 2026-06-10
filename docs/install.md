@@ -6,32 +6,42 @@ AI Open Platform 提供三种安装方式:**直接拉取预构建镜像(推荐)*
 
 ## 方式一:直接拉取预构建镜像(推荐)
 
-本项目通过 GitHub Actions 在每次推送到 `main` 分支时自动构建并发布 Docker 镜像到 Docker Hub,无需本地构建。
+本项目通过 GitHub Actions 在每次推送到 `main` 分支时自动构建并发布 Docker 镜像到 Docker Hub,无需本地构建环境(JDK/Maven/Node)。
 
-### 1. 拉取镜像
-
-```bash
-docker pull tooplick/open-api:latest
-```
-
-也可指定特定版本(基于 commit SHA):
-
-```bash
-docker pull tooplick/open-api:sha-<commit>
-```
-
-### 2. 使用 docker compose 启动
-
-clone 仓库(需要 `docker-compose.yml` 和 `schema.sql`):
+### 一键启动
 
 ```bash
 git clone https://github.com/tooplick/open-api.git && cd open-api
+docker compose -f docker-compose.prebuilt.yml up -d
 ```
 
-然后启动:
+### 自定义配置(可选)
 
 ```bash
-docker compose up -d
+cp .env.example .env
+```
+
+按需修改 `.env` 后重新启动:
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `AIOPEN_JWT_SECRET` | JWT 签名密钥,**生产必须改** | `change-me-please-...` |
+| `MYSQL_PASSWORD` | MySQL root 密码 | `root` |
+| `APP_PORT` | 对外暴露端口 | `8321` |
+
+### 指定版本
+
+```bash
+docker pull tooplick/open-api:sha-<commit>
+# 编辑 docker-compose.prebuilt.yml 中 image 字段
+```
+
+### 日常管理
+
+```bash
+docker compose -f docker-compose.prebuilt.yml logs -f app    # 跟踪后端日志
+docker compose -f docker-compose.prebuilt.yml down            # 停止,保留数据
+docker compose -f docker-compose.prebuilt.yml down -v         # 停止并清空数据库卷(重新建表)
 ```
 
 - 控制台 / API / 转发统一入口:`http://localhost:8321`

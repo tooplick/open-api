@@ -1,3 +1,5 @@
+# 使用预构建镜像一键启动,无需本地构建环境
+# 用法: docker compose -f docker-compose.prebuilt.yml up -d
 services:
   mysql:
     image: mysql:8.0
@@ -12,7 +14,6 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      # 首次初始化时自动建表(schema.sql 内含 DROP+CREATE,仅在数据卷为空时执行一次)
       - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_PASSWORD:-root}"]
@@ -21,26 +22,20 @@ services:
       retries: 10
       start_period: 180s
 
-  # 前后端合并:同一镜像里 Spring Boot 既出 Vue 页面又处理 API
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: tooplick/open-api:latest
     container_name: aiopen-app
     restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
     environment:
-      # 通过环境变量覆盖 application.yml 里的数据源(Spring Boot relaxed binding)
       SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/ai_open_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: "${MYSQL_PASSWORD:-root}"
-      # 生产请用 .env 或环境变量覆盖,务必 >=32 字节
       AIOPEN_JWT_SECRET: "${AIOPEN_JWT_SECRET:-change-me-please-use-a-long-random-secret-key-2026}"
       TZ: Asia/Shanghai
     ports:
-      # 前端页面 + /api + /v1 + /anthropic 都在这一个端口(容器内固定 8321)
       - "${APP_PORT:-8321}:8321"
 
 volumes:
